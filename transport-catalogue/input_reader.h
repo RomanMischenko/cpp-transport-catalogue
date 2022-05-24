@@ -7,6 +7,9 @@
 #include <deque>
 #include <vector>
 
+namespace input_reader {
+namespace detail {
+
 enum class QueryType {
     STOP,
     BUS_LINE,
@@ -25,12 +28,20 @@ struct Query {
     QueryType type;
     std::string name;
     std::vector<std::string> stops;
-    Coordinates coordinates;
+    coordinates::Coordinates coordinates;
     std::unordered_map<std::pair<std::string, std::string>, double, HasherWithString> road_distance_to_stop;
 };
 
-void QueryStringProcessing(Query& query, std::string& text);
+} // namespace detail
 
-void UpdateDatabase(std::vector<Query>& queries, TransportCatalogue& data);
+void ProcessingRequestStop(detail::Query& query, const std::string& text);
 
-void InputReader(std::istream& input, TransportCatalogue& data);
+void ProcessingRequestBus(detail::Query& query, const std::string& text);
+
+void QueryStringProcessing(detail::Query& query, const std::string& text);
+
+void UpdateDatabase(std::vector<detail::Query>& queries, transport_catalogue::TransportCatalogue& data);
+
+void InputReader(std::istream& input, transport_catalogue::TransportCatalogue& data);
+
+} // namespace input_reader

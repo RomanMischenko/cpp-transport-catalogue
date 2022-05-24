@@ -4,23 +4,27 @@
 #include <iostream>
 #include <sstream>
 
-void TransportCatalogue::AddRoute(std::string& name, std::vector<std::string>& stops) {
+using namespace transport_catalogue;
+
+void TransportCatalogue::AddRoute(std::string_view name, const std::vector<std::string>& stops) {
     // добавление маршрута
-    Route route;
-    route.route_name = std::move(name);
+    detail::Route route;
+    route.route_name = name;
     for (auto& stop : stops) {
         route.stops.push_back(FindStop(stop));
     }
     routes_.push_back(route);
-    routes_name_.insert({routes_.back().route_name, &routes_.back()});
+
+    detail::Route* last_added_route = &routes_.back();
+    routes_name_.insert({last_added_route->route_name, last_added_route});
     // добавление маршрутов через остановки
-    for (auto& stop : routes_.back().stops) {
-        stop->buses_for_stop.insert(&(routes_.back()));
+    for (auto& stop : last_added_route->stops) {
+        stop->buses_for_stop.insert(last_added_route);
     }
     // добавление географической дистанции
     auto i_end = route.stops.size() - 1;
     for (size_t i = 0; i < i_end; ++i) {
-        std::pair<Stop *, Stop *> pair_for_distance_calc;
+        std::pair<const detail::Stop *, const detail::Stop *> pair_for_distance_calc;
         pair_for_distance_calc.first = route.stops.at(i);
         pair_for_distance_calc.second = route.stops.at(i + 1);
         if (!geographical_distance_.count(pair_for_distance_calc)) {
@@ -31,12 +35,12 @@ void TransportCatalogue::AddRoute(std::string& name, std::vector<std::string>& s
     }
 }
 
-void TransportCatalogue::AddStop(std::string& name, Coordinates& coordinates) {
-    stops_.push_back({std::move(name), coordinates});
+void TransportCatalogue::AddStop(std::string_view name, const coordinates::Coordinates& coordinates) {
+    stops_.push_back({std::string(name), coordinates});
     stops_name_.insert({stops_.back().stop_name, &stops_.back()});
 }
 
-Stop* TransportCatalogue::FindStop(const std::string_view& name) const {
+detail::Stop* TransportCatalogue::FindStop(std::string_view name) const {
     if (stops_name_.count(name)) {
         return stops_name_.at(name);
     } else {
@@ -44,7 +48,7 @@ Stop* TransportCatalogue::FindStop(const std::string_view& name) const {
     }
 }
 
-Route* TransportCatalogue::FindRoute(const std::string_view& name) const {
+detail::Route* TransportCatalogue::FindRoute(std::string_view name) const {
     return routes_name_.at(name);
 }
 
@@ -55,7 +59,7 @@ std::ostringstream TransportCatalogue::RouteInfo(const std::string& name) const 
             << ": not found";
         return out;
     }
-    Route* route = FindRoute(name);
+    detail::Route* route = FindRoute(name);
     // уникальные остановки
     std::unordered_set<std::string> unique_stops;
     //вычисляем дистанции
@@ -83,32 +87,19 @@ std::ostringstream TransportCatalogue::RouteInfo(const std::string& name) const 
 
 }
 
-void TransportCatalogue::AddingDistanceBetweenStops(std::pair<Stop *, Stop *>& stops, double distance) {
-    road_distance_[std::move(stops)] = distance;
+void TransportCatalogue::SetDistanceBetweenStops(const detail::Stop& stop_from, const detail::Stop& stop_to, double distance) {
+    std::pair<const detail::Stop *, const detail::Stop *> tmp_pair;
+    tmp_pair.first = &stop_from;
+    tmp_pair.second = &stop_to;
+    road_distance_[tmp_pair] = distance;
 }
 
-double TransportCatalogue::GetDistanceBetweenStops(std::pair<Stop *, Stop *>& stops) {
-    if (geographical_distance_.count(stops)) {
-        return geographical_distance_.at(stops);
+double TransportCatalogue::GetDistanceBetweenStops(const detail::Stop& stop_from, const detail::Stop& stop_to) const {
+    std::pair<const detail::Stop *, const detail::Stop *> tmp_pair;
+    tmp_pair.first = &stop_from;
+    tmp_pair.second = &stop_to;
+    if (geographical_distance_.count(tmp_pair)) {
+        return geographical_distance_.at(tmp_pair);
     }
     return 0.0;
-}
-
-std::deque<Stop>& TransportCatalogue::GetStops() {
-    return stops_;
-}
-
-std::unordered_map<std::string_view, Stop *>& TransportCatalogue::GetStopsName() {
-    return stops_name_;
-}
-
-std::deque<Route>& TransportCatalogue::GetRoutes() {
-    return routes_;
-}
-std::unordered_map<std::string_view, Route *>& TransportCatalogue::GetRoutesName() {
-    return routes_name_;
-}
-
-std::unordered_map<std::pair<Stop *, Stop *>, double, HasherWithStop>& TransportCatalogue::GetDistance() {
-    return geographical_distance_;
 }
