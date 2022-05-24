@@ -31,9 +31,9 @@ int main() {
         "Stop Biryulyovo Zapadnoye\n"
     };
     
-    TransportCatalogue data;
-    InputReader(input, data);
-    DatabaseOutput(input_2, data);
-    //InputReader(std::cin, data);
-    //DatabaseOutput(std::cin, data);
+    transport_catalogue::TransportCatalogue data;
+    input_reader::InputReader(input, data);
+    stat_reader::DatabaseOutput(input_2, data);
+    //input_reader::InputReader(std::cin, data);
+    //input_reader::DatabaseOutput(std::cin, data);
 }
