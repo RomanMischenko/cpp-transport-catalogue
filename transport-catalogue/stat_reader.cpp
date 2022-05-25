@@ -3,6 +3,8 @@
 #include <sstream>
 #include <algorithm>
 
+using namespace transport_catalogue;
+
 void stat_reader::DatabaseOutput(std::istream& input, transport_catalogue::TransportCatalogue& data) {
     // обрабатываем целое число
     std::string text_tmp;
@@ -27,7 +29,7 @@ void stat_reader::DatabaseOutput(std::istream& input, transport_catalogue::Trans
             } else if (data.FindStop(queries)->buses_for_stop.size() == 0) {
                 std::cout << "Stop " << queries << ": no buses" << std::endl;
             } else {
-                std::vector<transport_catalogue::detail::Route *> stops{data.FindStop(queries)->buses_for_stop.begin(), 
+                std::vector<transport_catalogue::Route *> stops{data.FindStop(queries)->buses_for_stop.begin(), 
                     data.FindStop(queries)->buses_for_stop.end()};
                 // сортируем перед выводом
                 auto it_begin = stops.begin();

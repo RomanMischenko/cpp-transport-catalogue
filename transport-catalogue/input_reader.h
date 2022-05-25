@@ -7,14 +7,16 @@
 #include <deque>
 #include <vector>
 
+namespace transport_catalogue {
 namespace input_reader {
-namespace detail {
 
 enum class QueryType {
     STOP,
     BUS_LINE,
     BUS_ROUTE
 };
+
+namespace detail {
 
 class HasherWithString {
 public:
@@ -24,24 +26,17 @@ public:
     }
 };
 
+} // namespace detail
+
 struct Query {
     QueryType type;
     std::string name;
     std::vector<std::string> stops;
     coordinates::Coordinates coordinates;
-    std::unordered_map<std::pair<std::string, std::string>, double, HasherWithString> road_distance_to_stop;
+    std::unordered_map<std::pair<std::string, std::string>, double, detail::HasherWithString> road_distance_to_stop;
 };
 
-} // namespace detail
-
-void ProcessingRequestStop(detail::Query& query, const std::string& text);
-
-void ProcessingRequestBus(detail::Query& query, const std::string& text);
-
-void QueryStringProcessing(detail::Query& query, const std::string& text);
-
-void UpdateDatabase(std::vector<detail::Query>& queries, transport_catalogue::TransportCatalogue& data);
-
-void InputReader(std::istream& input, transport_catalogue::TransportCatalogue& data);
+void InputReader(std::istream& input, ::transport_catalogue::TransportCatalogue& data);
 
 } // namespace input_reader
+} // namespace transport_catalogue

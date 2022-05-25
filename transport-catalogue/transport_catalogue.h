@@ -11,7 +11,6 @@
 #include <unordered_set>
 
 namespace transport_catalogue {
-namespace detail {
 
 struct Stop;
 
@@ -35,32 +34,30 @@ public:
     }
 };
 
-} // namespace detail
-
 class TransportCatalogue {
  
 public:
     void AddRoute(std::string_view name, const std::vector<std::string>& stops);
     void AddStop(std::string_view name, const coordinates::Coordinates& coordinates);
 
-    detail::Route* FindRoute(std::string_view name) const;
-    detail::Stop* FindStop(std::string_view name) const;
+    Route* FindRoute(std::string_view name) const;
+    Stop* FindStop(std::string_view name) const;
 
     std::ostringstream RouteInfo(const std::string& name) const;
   
-    void SetDistanceBetweenStops(const detail::Stop& stop_from, const detail::Stop& stop_to, double distance);
+    void SetDistanceBetweenStops(const Stop& stop_from, const Stop& stop_to, double distance);
 
-    double GetDistanceBetweenStops(const detail::Stop& stop_from, const detail::Stop& stop_to) const;
+    double GetDistanceBetweenStops(const Stop& stop_from, const Stop& stop_to) const;
 
 private:
-    std::deque<detail::Route> routes_;
-    std::unordered_map<std::string_view, detail::Route *> routes_name_;
+    std::deque<Route> routes_;
+    std::unordered_map<std::string_view, Route *> routes_name_;
 
-    std::deque<detail::Stop> stops_;
-    std::unordered_map<std::string_view, detail::Stop *> stops_name_;
+    std::deque<Stop> stops_;
+    std::unordered_map<std::string_view, Stop *> stops_name_;
 
-    std::unordered_map<std::pair<const detail::Stop *, const detail::Stop *>, double, detail::HasherWithStop> geographical_distance_;
-    std::unordered_map<std::pair<const detail::Stop *, const detail::Stop *>, double, detail::HasherWithStop> road_distance_;
+    std::unordered_map<std::pair<const Stop *, const Stop *>, double, HasherWithStop> geographical_distance_;
+    std::unordered_map<std::pair<const Stop *, const Stop *>, double, HasherWithStop> road_distance_;
 };
 
 } // namespace transport_catalogue

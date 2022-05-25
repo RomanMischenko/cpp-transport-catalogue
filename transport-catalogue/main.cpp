@@ -32,8 +32,8 @@ int main() {
     };
     
     transport_catalogue::TransportCatalogue data;
-    input_reader::InputReader(input, data);
-    stat_reader::DatabaseOutput(input_2, data);
+    transport_catalogue::input_reader::InputReader(input, data);
+    transport_catalogue::stat_reader::DatabaseOutput(input_2, data);
     //input_reader::InputReader(std::cin, data);
     //input_reader::DatabaseOutput(std::cin, data);
 }

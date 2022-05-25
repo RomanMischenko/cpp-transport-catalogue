@@ -1,10 +1,12 @@
 #include "input_reader.h"
 
-void input_reader::ProcessingRequestStop(detail::Query& query, const std::string& text) {
+using namespace transport_catalogue::input_reader;
+
+void ProcessingRequestStop(Query& query, const std::string& text) {
     auto pos_colon = text.find(':');
     // окончание строки
     auto text_npos = text.npos;
-    query.type = detail::QueryType::STOP;
+    query.type = QueryType::STOP;
 
     // поиск разделителя
     auto pos_separator = text.find(" to ");
@@ -43,7 +45,7 @@ void input_reader::ProcessingRequestStop(detail::Query& query, const std::string
     }
 }
 
-void input_reader::ProcessingRequestBus(detail::Query& query, const std::string& text) {
+void ProcessingRequestBus(Query& query, const std::string& text) {
     auto pos_colon = text.find(':');
     // окончание строки
     auto text_npos = text.npos;
@@ -52,7 +54,7 @@ void input_reader::ProcessingRequestBus(detail::Query& query, const std::string&
     auto pos_greater_than = text.find('>');
 
     // функция добавления остановок в запрос
-    auto AddStopInQuery = [pos_colon, text_npos](detail::Query& query, const std::string& text, char sep, size_t pos_sep){
+    auto AddStopInQuery = [pos_colon, text_npos](Query& query, const std::string& text, char sep, size_t pos_sep){
         // добавляем остановки
         auto stop_name_begin = text.find_first_not_of(' ', pos_colon + 1);
         auto stop_name_end = text.find_last_not_of(' ', pos_sep - 1) + 1;
@@ -73,7 +75,7 @@ void input_reader::ProcessingRequestBus(detail::Query& query, const std::string&
 
     // если маршрут прямой
     if (pos_dash != text_npos) {
-        query.type = detail::QueryType::BUS_LINE;   
+        query.type = QueryType::BUS_LINE;   
 
         AddStopInQuery(query, text, '-', pos_dash);
 
@@ -84,13 +86,13 @@ void input_reader::ProcessingRequestBus(detail::Query& query, const std::string&
             query.stops.at(route_size - 1 - i) = query.stops.at(i);
         }
     } else if (pos_greater_than != text_npos) { // если маршрут кольцевой
-        query.type = detail::QueryType::BUS_ROUTE;
+        query.type = QueryType::BUS_ROUTE;
         
         AddStopInQuery(query, text, '>', pos_greater_than);
     }
 }
 
-void input_reader::QueryStringProcessing(detail::Query& query, const std::string& text) {
+void QueryStringProcessing(Query& query, const std::string& text) {
     std::string command;
     // поиск команды
     auto pos_queries_type_begin = text.find_first_not_of(' ');
@@ -107,24 +109,24 @@ void input_reader::QueryStringProcessing(detail::Query& query, const std::string
     }
 }
 
-void input_reader::UpdateDatabase(std::vector<detail::Query>& queries, transport_catalogue::TransportCatalogue& data) {
+void UpdateDatabase(std::vector<Query>& queries, transport_catalogue::TransportCatalogue& data) {
     // сначала добавляем остановки
     for (auto& query : queries) {
-        if (query.type != detail::QueryType::STOP) {
+        if (query.type != QueryType::STOP) {
             continue;
         }
         data.AddStop(query.name, query.coordinates);
     }
     // добавляем маршруты
     for (auto& query : queries) {
-        if (query.type == detail::QueryType::STOP) {
+        if (query.type == QueryType::STOP) {
             continue;
         }
         data.AddRoute(query.name, query.stops);
     }
     // добавляем дистанцию между маршрутами
     for (auto& query : queries) {
-        if (query.type != detail::QueryType::STOP) {
+        if (query.type != QueryType::STOP) {
             continue;
         }
         for (auto& [from_to, distance] : query.road_distance_to_stop) {
@@ -137,14 +139,14 @@ void input_reader::UpdateDatabase(std::vector<detail::Query>& queries, transport
     }
 }
 
-void input_reader::InputReader(std::istream& input, transport_catalogue::TransportCatalogue& data) {
+void ::transport_catalogue::input_reader::InputReader(std::istream& input, ::transport_catalogue::TransportCatalogue& data) {
     // обрабатываем целое число
     std::string text_tmp;
     std::getline(input, text_tmp);
     int number_of_requests = std::stoi(text_tmp);
 
     // создаем базу запросов
-    std::vector<detail::Query> queries(number_of_requests);
+    std::vector<Query> queries(number_of_requests);
     // обрабатываем запросы
     for (int i = 0; i < number_of_requests; ++i) {
         std::getline(input, text_tmp);
