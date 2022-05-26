@@ -1,6 +1,6 @@
 #include "input_reader.h"
 
-using namespace transport_catalogue::input_reader;
+namespace transport_catalogue::input_reader {
 
 void ProcessingRequestStop(Query& query, const std::string& text) {
     auto pos_colon = text.find(':');
@@ -139,7 +139,7 @@ void UpdateDatabase(std::vector<Query>& queries, transport_catalogue::TransportC
     }
 }
 
-void ::transport_catalogue::input_reader::InputReader(std::istream& input, ::transport_catalogue::TransportCatalogue& data) {
+void InputReader(std::istream& input, ::transport_catalogue::TransportCatalogue& data) {
     // обрабатываем целое число
     std::string text_tmp;
     std::getline(input, text_tmp);
@@ -156,3 +156,5 @@ void ::transport_catalogue::input_reader::InputReader(std::istream& input, ::tra
     // обновляем каталог
     UpdateDatabase(queries, data);
 }
+
+} // namespace transport_catalogue::input_reader

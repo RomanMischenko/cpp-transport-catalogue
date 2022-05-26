@@ -3,7 +3,7 @@
 #include <sstream>
 #include <algorithm>
 
-using namespace transport_catalogue;
+namespace transport_catalogue {
 
 void stat_reader::DatabaseOutput(std::istream& input, transport_catalogue::TransportCatalogue& data) {
     // обрабатываем целое число
@@ -46,3 +46,5 @@ void stat_reader::DatabaseOutput(std::istream& input, transport_catalogue::Trans
         }
     }
 }
+
+} // namespace transport_catalogue

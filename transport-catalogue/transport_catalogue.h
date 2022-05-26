@@ -25,6 +25,7 @@ struct Stop {
     std::unordered_set<Route *> buses_for_stop = {};
 };
 
+namespace detail {
 
 class HasherWithStop {
 public:
@@ -33,6 +34,8 @@ public:
         return std::hash<std::string>{}(str);
     }
 };
+
+} // namespace detail
 
 class TransportCatalogue {
  
@@ -56,8 +59,8 @@ private:
     std::deque<Stop> stops_;
     std::unordered_map<std::string_view, Stop *> stops_name_;
 
-    std::unordered_map<std::pair<const Stop *, const Stop *>, double, HasherWithStop> geographical_distance_;
-    std::unordered_map<std::pair<const Stop *, const Stop *>, double, HasherWithStop> road_distance_;
+    std::unordered_map<std::pair<const Stop *, const Stop *>, double, detail::HasherWithStop> geographical_distance_;
+    std::unordered_map<std::pair<const Stop *, const Stop *>, double, detail::HasherWithStop> road_distance_;
 };
 
 } // namespace transport_catalogue

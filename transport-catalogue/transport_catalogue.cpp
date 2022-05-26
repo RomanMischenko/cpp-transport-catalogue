@@ -4,7 +4,7 @@
 #include <iostream>
 #include <sstream>
 
-using namespace transport_catalogue;
+namespace transport_catalogue {
 
 void TransportCatalogue::AddRoute(std::string_view name, const std::vector<std::string>& stops) {
     // добавление маршрута
@@ -103,3 +103,5 @@ double TransportCatalogue::GetDistanceBetweenStops(const Stop& stop_from, const 
     }
     return 0.0;
 }
+
+} // namespace transport_catalogue
