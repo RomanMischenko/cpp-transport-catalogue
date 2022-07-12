@@ -35,7 +35,7 @@ void TransportCatalogue::AddRoute(std::string_view name, const std::vector<std::
     }
 }
 
-void TransportCatalogue::AddStop(std::string_view name, const coordinates::Coordinates& coordinates) {
+void TransportCatalogue::AddStop(std::string_view name, const geo::Coordinates& coordinates) {
     stops_.push_back({std::string(name), coordinates});
     stops_name_.insert({stops_.back().stop_name, &stops_.back()});
 }
@@ -49,7 +49,12 @@ Stop* TransportCatalogue::FindStop(std::string_view name) const {
 }
 
 Route* TransportCatalogue::FindRoute(std::string_view name) const {
-    return routes_name_.at(name);
+    if (routes_name_.count(name)) {
+        return routes_name_.at(name);
+    } else {
+        return nullptr;
+    }
+    
 }
 
 std::ostringstream TransportCatalogue::RouteInfo(const std::string& name) const {
@@ -87,19 +92,29 @@ std::ostringstream TransportCatalogue::RouteInfo(const std::string& name) const 
 
 }
 
-void TransportCatalogue::SetDistanceBetweenStops(const Stop& stop_from, const Stop& stop_to, double distance) {
+void TransportCatalogue::SetRoadDistanceBetweenStops(const Stop& stop_from, const Stop& stop_to, double distance) {
     std::pair<const Stop *, const Stop *> tmp_pair;
     tmp_pair.first = &stop_from;
     tmp_pair.second = &stop_to;
     road_distance_[tmp_pair] = distance;
 }
 
-double TransportCatalogue::GetDistanceBetweenStops(const Stop& stop_from, const Stop& stop_to) const {
+double TransportCatalogue::GetGeographicalDistanceBetweenStops(const Stop& stop_from, const Stop& stop_to) const {
     std::pair<const Stop *, const Stop *> tmp_pair;
     tmp_pair.first = &stop_from;
     tmp_pair.second = &stop_to;
     if (geographical_distance_.count(tmp_pair)) {
         return geographical_distance_.at(tmp_pair);
+    }
+    return 0.0;
+}
+
+double TransportCatalogue::GetRoadDistanceBetweenStops(const Stop& stop_from, const Stop& stop_to) const {
+    std::pair<const Stop *, const Stop *> tmp_pair;
+    tmp_pair.first = &stop_from;
+    tmp_pair.second = &stop_to;
+    if (road_distance_.count(tmp_pair)) {
+        return road_distance_.at(tmp_pair);
     }
     return 0.0;
 }

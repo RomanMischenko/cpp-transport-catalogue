@@ -1,6 +1,6 @@
 #pragma once
 
-#include "geo.h"
+#include "domain.h"
 
 #include <vector>
 #include <unordered_map>
@@ -21,7 +21,7 @@ struct Route {
 
 struct Stop {
     std::string stop_name;
-    coordinates::Coordinates coordinates;
+    geo::Coordinates coordinates;
     std::unordered_set<Route *> buses_for_stop = {};
 };
 
@@ -41,16 +41,17 @@ class TransportCatalogue {
  
 public:
     void AddRoute(std::string_view name, const std::vector<std::string>& stops);
-    void AddStop(std::string_view name, const coordinates::Coordinates& coordinates);
+    void AddStop(std::string_view name, const geo::Coordinates& coordinates);
 
     Route* FindRoute(std::string_view name) const;
     Stop* FindStop(std::string_view name) const;
 
     std::ostringstream RouteInfo(const std::string& name) const;
   
-    void SetDistanceBetweenStops(const Stop& stop_from, const Stop& stop_to, double distance);
+    void SetRoadDistanceBetweenStops(const Stop& stop_from, const Stop& stop_to, double distance);
 
-    double GetDistanceBetweenStops(const Stop& stop_from, const Stop& stop_to) const;
+    double GetGeographicalDistanceBetweenStops(const Stop& stop_from, const Stop& stop_to) const;
+    double GetRoadDistanceBetweenStops(const Stop& stop_from, const Stop& stop_to) const;
 
 private:
     std::deque<Route> routes_;
