@@ -17,22 +17,6 @@ void IgnoreWhiteSpace(istream& input) {
     input.putback(c);
 }
 
-bool IsDigit(char c) {
-    if (c == '0' ||
-        c == '1' ||
-        c == '2' ||
-        c == '3' ||
-        c == '4' ||
-        c == '5' ||
-        c == '6' ||
-        c == '7' ||
-        c == '8' ||
-        c == '9') {
-        return true;
-    }
-    return false;
-}
-
 Node LoadBool(istream& input) {
     std::string s;
     char c;
@@ -255,7 +239,7 @@ Node LoadNode(istream& input) {
         return LoadDict(input);
     } else if (c == '"') {
         return LoadString(input);
-    } else if (c == '-' || IsDigit(c)) {
+    } else if (c == '-' || std::isdigit(c)) {
         input.putback(c);
         return LoadNumber(input);
     } else if (c == 't' || c == 'f') {

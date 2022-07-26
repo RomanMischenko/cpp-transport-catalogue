@@ -5,9 +5,22 @@
 #include <string>
 #include <deque>
 #include <vector>
-#include <unordered_map>
+#include <unordered_set>
 
 namespace domain {
+
+struct Stop;
+
+struct Route {
+    std::string route_name;
+    std::vector<Stop *> stops;
+};
+
+struct Stop {
+    std::string stop_name;
+    geo::Coordinates coordinates;
+    std::unordered_set<Route *> buses_for_stop = {};
+};
 
 namespace detail {
 

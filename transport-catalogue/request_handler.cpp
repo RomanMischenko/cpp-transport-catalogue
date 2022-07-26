@@ -32,7 +32,7 @@ json::Document request_handler::RequestHandler::DatabaseOutput() {
                 tmp_response.at(i) = answer;
                 continue;
             }
-            std::vector<transport_catalogue::Route *> buses{data_.FindStop(query.name)->buses_for_stop.begin(), 
+            std::vector<domain::Route *> buses{data_.FindStop(query.name)->buses_for_stop.begin(), 
                     data_.FindStop(query.name)->buses_for_stop.end()};
                 // сортируем перед выводом
                 auto it_begin = buses.begin();
@@ -66,7 +66,7 @@ json::Document request_handler::RequestHandler::DatabaseOutput() {
                 tmp_response.at(i) = answer;
                 continue;
             }
-            transport_catalogue::Route* route = data_.FindRoute(query.name);
+            domain::Route* route = data_.FindRoute(query.name);
             // уникальные остановки
             std::unordered_set<std::string> unique_stops;
             //вычисляем дистанции
