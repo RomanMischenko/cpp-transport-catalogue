@@ -379,24 +379,33 @@ struct PrintContext {
     }
 };
 
+void PrintNode(const Node& value, const PrintContext& ctx);
+
 // Шаблон, подходящий для вывода double, int
 template <typename Value>
-void PrintValue(const Value& value, PrintContext& ctx) {
+void PrintValue(const Value& value, const PrintContext& ctx) {
     ctx.out << value;
 }
 
 // Перегрузка функции PrintValue для вывода значений null
-void PrintValue(std::nullptr_t, PrintContext& ctx) {
+// В специализаци шаблона PrintValue для типа nullptr_t параметр value передаётся
+// по константной ссылке, как и в основном шаблоне.
+template <>
+void PrintValue<std::nullptr_t>(const std::nullptr_t&, const PrintContext& ctx) {
     ctx.out << "null"sv;
 }
 
 // Перегрузка функции PrintValue для вывода значений bool
-void PrintValue(bool b, PrintContext& ctx) {
+// В специализаци шаблона PrintValue для типа bool параметр value передаётся
+// по константной ссылке, как и в основном шаблоне.
+template <>
+void PrintValue<bool>(const bool& b, const PrintContext& ctx) {
     b ? ctx.out << "true"sv : ctx.out << "false"sv;
 }
 
 // Перегрузка функции PrintValue для вывода значений string
-void PrintValue(const string& s, PrintContext& ctx) {
+template <>
+void PrintValue<std::string>(const string& s, const PrintContext& ctx) {
     ctx.out << "\""sv;
     for (const auto& c : s) {
         if (c == '\"') {
@@ -415,56 +424,70 @@ void PrintValue(const string& s, PrintContext& ctx) {
 }
 
 // Перегрузка функции PrintValue для вывода значений array
-void PrintValue(const Array& arr, PrintContext& ctx) {
+template <>
+void PrintValue<Array>(const Array& arr, const PrintContext& ctx) {
+    std::ostream& out = ctx.out;
     const size_t arr_size = arr.size();
+    auto inner_ctx = ctx.Indented();
     if (arr_size == 0) {
-        ctx.out << "[]"sv;
+        out << "[]"sv;
         return;
     }
-    ctx.out << "["sv;
+    out << "[\n"sv;
     for (size_t i = 0; i < arr_size - 1; ++i) {
-        Print(Document{arr.at(i)}, ctx.Indented().out);
-        ctx.out << ", "sv;
+        inner_ctx.PrintIndent();
+        PrintNode(arr.at(i), inner_ctx);
+        out << ",\n"sv;
     }
-    Print(Document{arr.at(arr_size - 1)}, ctx.Indented().out);
-    ctx.out << "]"sv;
+    inner_ctx.PrintIndent();
+    PrintNode(arr.at(arr_size - 1), inner_ctx);
+    out.put('\n');
+    ctx.PrintIndent();
+    out << "]"sv;
 }
 
 // Перегрузка функции PrintValue для вывода значений Dict
-void PrintValue(const Dict& dict, PrintContext& ctx) {
-    
+template <>
+void PrintValue<Dict>(const Dict& dict, const PrintContext& ctx) {
+    std::ostream& out = ctx.out;
+    auto inner_ctx = ctx.Indented();
     const size_t dict_size = dict.size();
     if (dict_size == 0) {
-        ctx.out << "{}"sv;
+        out << "{}"sv;
         return;
     }
 
-    ctx.out << "{"sv;
+    out << "{\n"sv;
     bool first = true;
     for (const auto& [key, value] : dict) {
         if (!first) {
-            ctx.out << ", "sv;
+            out << ",\n"sv;
         }
         first = false;
-        Print(Document{key}, ctx.Indented().out);
-        ctx.out << ": "sv;
-        Print(Document{value}, ctx.Indented().out);
+        inner_ctx.PrintIndent();
+        PrintValue(key, ctx);
+        out << ": "sv;
+        PrintNode(value, inner_ctx);
     }
-    ctx.out << "}"sv;
+    out.put('\n');
+    ctx.PrintIndent();
+    out << "}"sv;
 }
 
 const std::variant<std::nullptr_t, int, double, std::string, bool, Array, Dict>& Node::GetValue() const {
     return value_;
 }
 
-void Print(const Document& doc, std::ostream& output) {
-    using namespace std::literals;
+void PrintNode(const Node& node, const PrintContext& ctx) {
     std::visit(
-        [&output](const auto& value){ 
-            PrintContext ctx{output};
-            ctx.PrintIndent();
-            PrintValue(value, ctx); },
-        doc.GetRoot().GetValue());
+        [&ctx](const auto& value) {
+            PrintValue(value, ctx);
+        },
+        node.GetValue());
+}
+
+void Print(const Document& doc, std::ostream& output) {
+    PrintNode(doc.GetRoot(), PrintContext{output});
 }
 
 }  // namespace json
