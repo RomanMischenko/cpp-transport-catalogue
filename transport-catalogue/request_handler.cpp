@@ -96,4 +96,3 @@ std::vector<request_handler::BaseRequests>& request_handler::RequestHandler::Get
 std::vector<request_handler::StatRequests>& request_handler::RequestHandler::GetStatRequests(){
     return stat_requests_;
 }
-
