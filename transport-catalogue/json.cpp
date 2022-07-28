@@ -255,6 +255,10 @@ Node LoadNode(istream& input) {
 
 }  // namespace
 
+Node::Node() 
+    : value_(nullptr) {
+}
+
 Node::Node(std::nullptr_t) 
     : value_(nullptr) {
 }
@@ -279,6 +283,10 @@ Node::Node(Dict map)
 }
 
 Node::Node(string value)
+    : value_(move(value)) {
+}
+
+Node::Node(Value value)
     : value_(move(value)) {
 }
 
