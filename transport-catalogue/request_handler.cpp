@@ -1,4 +1,5 @@
 #include "request_handler.h"
+#include "json_builder.h"
 
 #include <algorithm>
 #include <sstream>
@@ -15,21 +16,18 @@ json::Document request_handler::RequestHandler::DatabaseOutput() {
     // вычисляем количество запросов к базе данных
     size_t query_count = stat_requests_.size();
     // создаем массив ответов
-    std::vector<json::Node> tmp_response(query_count);
+    json::Builder tmp_response;
+    tmp_response.StartArray();
+    //std::vector<json::Node> tmp_response(query_count);
     for (size_t i = 0; i < query_count; ++i) {
-        json::Dict answer;
+        //json::Dict answer;
+        tmp_response.StartDict();
         const auto& query = stat_requests_.at(i);
         if (query.type == request_handler::StatRequests::QueryType::STOP) {
             if (data_.FindStop(query.name) == nullptr) {
-                answer.emplace(
-                    "request_id"s,
-                    query.id
-                );
-                answer.emplace(
-                    "error_message"s,
-                    "not found"s
-                );
-                tmp_response.at(i) = answer;
+                tmp_response.Key("request_id"s).Value(query.id);
+                tmp_response.Key("error_message"s).Value("not found"s);
+                tmp_response.EndDict();
                 continue;
             }
             std::vector<domain::Route *> buses{data_.FindStop(query.name)->buses_for_stop.begin(), 
@@ -42,28 +40,16 @@ json::Document request_handler::RequestHandler::DatabaseOutput() {
             });
             json::Array tmp_bus_name;
             for (const auto& bus : buses) {
-                tmp_bus_name.push_back(bus->route_name);
+                tmp_bus_name.push_back({bus->route_name});
             }
-            answer.emplace(
-                "buses"s,
-                tmp_bus_name
-            );
-            answer.emplace(
-                "request_id"s,
-                query.id
-            );
-            tmp_response.at(i) = answer;
+            tmp_response.Key("buses"s).Value(tmp_bus_name);
+            tmp_response.Key("request_id"s).Value(query.id);
+            tmp_response.EndDict();
         } else if (query.type == request_handler::StatRequests::QueryType::BUS) {
             if (data_.FindRoute(query.name) == nullptr) {
-                answer.emplace(
-                    "request_id"s,
-                    query.id
-                );
-                answer.emplace(
-                    "error_message"s,
-                    "not found"s
-                );
-                tmp_response.at(i) = answer;
+                tmp_response.Key("request_id"s).Value(query.id);
+                tmp_response.Key("error_message"s).Value("not found"s);
+                tmp_response.EndDict();
                 continue;
             }
             domain::Route* route = data_.FindRoute(query.name);
@@ -84,42 +70,22 @@ json::Document request_handler::RequestHandler::DatabaseOutput() {
                     roat_distance += data_.GetRoadDistanceBetweenStops(*(route->stops.at(i + 1)), *(route->stops.at(i)));
                 }
             }
-            answer.emplace(
-                "curvature"s,
-                roat_distance/geographical_distance
-            );
-            answer.emplace(
-                "request_id"s,
-                query.id
-            );
-            answer.emplace(
-                "route_length"s,
-                roat_distance
-            );
-            answer.emplace(
-                "stop_count"s,
-                static_cast<int>(route->stops.size())
-            );
-            answer.emplace(
-                "unique_stop_count"s,
-                static_cast<int>(unique_stops.size())
-            );
-            tmp_response.at(i) = answer;
+            tmp_response.Key("curvature"s).Value(roat_distance/geographical_distance);
+            tmp_response.Key("request_id"s).Value(query.id);
+            tmp_response.Key("route_length"s).Value(roat_distance);
+            tmp_response.Key("stop_count"s).Value(static_cast<int>(route->stops.size()));
+            tmp_response.Key("unique_stop_count"s).Value(static_cast<int>(unique_stops.size()));
+            tmp_response.EndDict();
         } else if (query.type == request_handler::StatRequests::QueryType::MAP) {
             std::ostringstream output;
             map_renderer_.Draw(output);
-            answer.emplace(
-                "map"s,
-                output.str()
-            );
-            answer.emplace(
-                "request_id"s,
-                query.id
-            );
-            tmp_response.at(i) = answer;
+            tmp_response.Key("map"s).Value(output.str());
+            tmp_response.Key("request_id"s).Value(query.id);
+            tmp_response.EndDict();
         }
     }
-    json::Document response{std::move(tmp_response)};
+    tmp_response.EndArray();
+    json::Document response{std::move(tmp_response.Build())};
     return response;
 }
 

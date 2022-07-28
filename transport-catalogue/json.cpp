@@ -255,30 +255,7 @@ Node LoadNode(istream& input) {
 
 }  // namespace
 
-Node::Node(std::nullptr_t) 
-    : value_(nullptr) {
-}
-
-Node::Node(int num)
-    : value_(num) {
-}
-
-Node::Node(double num)
-    : value_(num) {
-}
-
-Node::Node(bool v)
-    : value_(v) {
-}
-
-Node::Node(Array array)
-    : value_(move(array)) {
-}
-Node::Node(Dict map)
-    : value_(move(map)) {
-}
-
-Node::Node(string value)
+Node::Node(Value value)
     : value_(move(value)) {
 }
 
