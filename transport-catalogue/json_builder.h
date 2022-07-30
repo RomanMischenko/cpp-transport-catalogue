@@ -42,8 +42,6 @@ private:
     bool have_key_ = false;
 };
 
-
-
 class KeyItemContext : public Builder::ItemContext {
 public:
     KeyItemContext(Builder& builer);
