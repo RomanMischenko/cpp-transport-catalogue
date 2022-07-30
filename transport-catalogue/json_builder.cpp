@@ -2,8 +2,9 @@
 
 #include <algorithm>
 
-using namespace json;
 using std::literals::string_literals::operator""s;
+
+namespace json {
 
 KeyItemContext Builder::Key(std::string value) {
     // вызов метода key при наличии другого ключа
@@ -169,6 +170,40 @@ json::Node Builder::Build() {
     return node_;
 }
 
+// "костыль", чтобы у ItemContext был конструктор по умолчанию
+// а без этого конструктора не работают конструкторы наследников
+// не могу найти способ как это обойти иначе
+Builder tmp;
+
+// ---- ItemContext ----
+Builder::ItemContext::ItemContext() 
+: builder_(tmp)
+{}
+Builder::ItemContext::ItemContext(Builder& builder) 
+: builder_(builder)
+{}
+KeyItemContext Builder::ItemContext::Key(std::string key) {
+    builder_.Key(key);
+    return builder_;
+}
+StartDictItemContext Builder::ItemContext::StartDict() {
+    builder_.StartDict();
+    return builder_;
+}
+StartArrayItemContext Builder::ItemContext::StartArray() {
+    builder_.StartArray();
+    return builder_;
+}
+Builder& Builder::ItemContext::EndDict() {
+    builder_.EndDict();
+    return builder_;
+}
+Builder& Builder::ItemContext::EndArray() {
+    builder_.EndArray();
+    return builder_;
+}
+
+// ---- KeyItemContext ----
 KeyItemContext::KeyItemContext(Builder& builder)
 : builder_(builder)
 {}
@@ -176,55 +211,26 @@ ValueItemContext KeyItemContext::Value(Node::Value value) {
     builder_.Value(value);
     return builder_;
 }
-StartDictItemContext KeyItemContext::StartDict() {
-    builder_.StartDict();
-    return builder_;
-}
-StartArrayItemContext KeyItemContext::StartArray() {
-    builder_.StartArray();
-    return builder_;
-}
 
+// ---- StartDictItemContext ----
 StartDictItemContext::StartDictItemContext(Builder& builder)
 : builder_(builder)
 {}
-KeyItemContext StartDictItemContext::Key(std::string key) {
-    builder_.Key(key);
-    return builder_;
-}
-Builder& StartDictItemContext::EndDict() {
-    builder_.EndDict();
-    return builder_;
-}
 
+// ---- StartArrayItemContext ----
 StartArrayItemContext::StartArrayItemContext(Builder& builder)
 : builder_(builder)
 {}
+
+// ---- StartArrayItemContext ----
 StartArrayItemContext StartArrayItemContext::Value(Node::Value value) {
     builder_.Value(value);
     return builder_;
 }
-StartDictItemContext StartArrayItemContext::StartDict() {
-    builder_.StartDict();
-    return builder_;
-}
-StartArrayItemContext StartArrayItemContext::StartArray() {
-    builder_.StartArray();
-    return builder_;
-}
-Builder& StartArrayItemContext::EndArray() {
-    builder_.EndArray();
-    return builder_;
-}
 
+// ---- ValueItemContext ----
 ValueItemContext::ValueItemContext(Builder& builder)
 : builder_(builder)
 {}
-KeyItemContext ValueItemContext::Key(std::string key) {
-    builder_.Key(key);
-    return builder_;
-}
-Builder& ValueItemContext::EndDict() {
-    builder_.EndDict();
-    return builder_;
-}
+
+} // namespace json

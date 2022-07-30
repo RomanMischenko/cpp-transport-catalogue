@@ -19,6 +19,21 @@ public:
     Builder& EndDict();
     Builder& EndArray();
     json::Node Build();
+
+    class ItemContext {
+    public:
+        ItemContext();
+        ItemContext(Builder& builder);
+
+        KeyItemContext Key(std::string);
+        StartDictItemContext StartDict();
+        StartArrayItemContext StartArray();
+        Builder& EndDict();
+        Builder& EndArray();
+    protected:
+        Builder& builder_;
+    };
+
 private:
     json::Node node_;
     std::vector<json::Node *> node_stack_;
@@ -27,41 +42,47 @@ private:
     bool have_key_ = false;
 };
 
-class KeyItemContext {
+
+
+class KeyItemContext : public Builder::ItemContext {
 public:
-    KeyItemContext(Builder& builder);
+    KeyItemContext(Builder& builer);
     ValueItemContext Value(Node::Value value);
-    StartDictItemContext StartDict();
-    StartArrayItemContext StartArray();
+
+    Builder& EndDict() = delete;
+    Builder& EndArray() = delete;
 private:
     Builder& builder_;
 };
 
-class StartDictItemContext {
+class StartDictItemContext : public Builder::ItemContext {
 public:
     StartDictItemContext(Builder& builder);
-    KeyItemContext Key(std::string key);
-    Builder& EndDict();
+
+    StartDictItemContext StartDict() = delete;
+    StartArrayItemContext StartArray() = delete;
+    Builder& EndArray() = delete;
 private:
     Builder& builder_;
 };
 
-class StartArrayItemContext {
+class StartArrayItemContext : public Builder::ItemContext {
 public:
     StartArrayItemContext(Builder& builder);
     StartArrayItemContext Value(Node::Value value);
-    StartDictItemContext StartDict();
-    StartArrayItemContext StartArray();
-    Builder& EndArray();
+
+    KeyItemContext Key(std::string) = delete;
+    Builder& EndDict() = delete;
 private:
     Builder& builder_;
 };
 
-class ValueItemContext {
+class ValueItemContext : public Builder::ItemContext {
 public:
     ValueItemContext(Builder& builder);
-    KeyItemContext Key(std::string key);
-    Builder& EndDict();
+    Builder& EndArray() = delete;
+    StartDictItemContext StartDict() = delete;
+    StartArrayItemContext StartArray() = delete;
 private:
     Builder& builder_;
 };
