@@ -6,7 +6,7 @@ using std::literals::string_literals::operator""s;
 
 namespace json {
 
-KeyItemContext Builder::Key(std::string value) {
+Builder::KeyItemContext Builder::Key(std::string value) {
     // вызов метода key при наличии другого ключа
     if (have_key_ == true) {
         throw std::logic_error("key is already ready"s);
@@ -61,7 +61,7 @@ Builder& Builder::Value(Node::Value value) {
     return *this;
 }
 
-StartDictItemContext Builder::StartDict() {
+Builder::StartDictItemContext Builder::StartDict() {
     // если не после конструктора
     // если не после key
     // если не после предыдущего эл-та массива
@@ -98,7 +98,7 @@ StartDictItemContext Builder::StartDict() {
     return *this;
 }
 
-StartArrayItemContext Builder::StartArray() {
+Builder::StartArrayItemContext Builder::StartArray() {
     // если не после конструктора
     // если не после key
     // если не после предыдущего эл-та массива
@@ -170,27 +170,19 @@ json::Node Builder::Build() {
     return node_;
 }
 
-// "костыль", чтобы у ItemContext был конструктор по умолчанию
-// а без этого конструктора не работают конструкторы наследников
-// не могу найти способ как это обойти иначе
-Builder tmp;
-
 // ---- ItemContext ----
-Builder::ItemContext::ItemContext() 
-: builder_(tmp)
-{}
 Builder::ItemContext::ItemContext(Builder& builder) 
 : builder_(builder)
 {}
-KeyItemContext Builder::ItemContext::Key(std::string key) {
+Builder::KeyItemContext Builder::ItemContext::Key(std::string key) {
     builder_.Key(key);
     return builder_;
 }
-StartDictItemContext Builder::ItemContext::StartDict() {
+Builder::StartDictItemContext Builder::ItemContext::StartDict() {
     builder_.StartDict();
     return builder_;
 }
-StartArrayItemContext Builder::ItemContext::StartArray() {
+Builder::StartArrayItemContext Builder::ItemContext::StartArray() {
     builder_.StartArray();
     return builder_;
 }
@@ -204,33 +196,33 @@ Builder& Builder::ItemContext::EndArray() {
 }
 
 // ---- KeyItemContext ----
-KeyItemContext::KeyItemContext(Builder& builder)
-: builder_(builder)
+Builder::KeyItemContext::KeyItemContext(Builder& builder)
+: ItemContext::ItemContext(builder)
 {}
-ValueItemContext KeyItemContext::Value(Node::Value value) {
+Builder::ValueItemContext Builder::KeyItemContext::Value(Node::Value value) {
     builder_.Value(value);
     return builder_;
 }
 
 // ---- StartDictItemContext ----
-StartDictItemContext::StartDictItemContext(Builder& builder)
-: builder_(builder)
+Builder::StartDictItemContext::StartDictItemContext(Builder& builder)
+: ItemContext::ItemContext(builder)
 {}
 
 // ---- StartArrayItemContext ----
-StartArrayItemContext::StartArrayItemContext(Builder& builder)
-: builder_(builder)
+Builder::StartArrayItemContext::StartArrayItemContext(Builder& builder)
+: ItemContext::ItemContext(builder)
 {}
 
 // ---- StartArrayItemContext ----
-StartArrayItemContext StartArrayItemContext::Value(Node::Value value) {
+Builder::StartArrayItemContext Builder::StartArrayItemContext::Value(Node::Value value) {
     builder_.Value(value);
     return builder_;
 }
 
 // ---- ValueItemContext ----
-ValueItemContext::ValueItemContext(Builder& builder)
-: builder_(builder)
+Builder::ValueItemContext::ValueItemContext(Builder& builder)
+: ItemContext::ItemContext(builder)
 {}
 
 } // namespace json
