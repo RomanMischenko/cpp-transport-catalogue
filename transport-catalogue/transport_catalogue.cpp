@@ -6,7 +6,10 @@
 
 namespace transport_catalogue {
 
-void TransportCatalogue::AddRoute(std::string_view name, const std::vector<std::string>& stops) {
+using RoutesName = std::unordered_map<std::string_view, domain::Route *>;
+using StopsName = std::unordered_map<std::string_view, domain::Stop *>;
+
+void TransportCatalogue::AddRoute(std::string_view name, const std::vector<std::string>& stops, bool is_round_trip) {
     // добавление маршрута
     domain::Route route;
     route.route_name = name;
@@ -33,6 +36,8 @@ void TransportCatalogue::AddRoute(std::string_view name, const std::vector<std::
             geographical_distance_.insert({pair_for_distance_calc, distance});
         }
     }
+    // добавление информации о типе маршрута
+    is_round_trip_.insert({last_added_route.route_name, is_round_trip});
 }
 
 void TransportCatalogue::AddStop(std::string_view name, const geo::Coordinates& coordinates) {
@@ -56,7 +61,7 @@ domain::Route* TransportCatalogue::FindRoute(std::string_view name) const {
     }
     
 }
-
+/* 
 std::ostringstream TransportCatalogue::RouteInfo(const std::string& name) const {
     std::ostringstream out;
     if (routes_name_.count(name) == 0) {
@@ -89,7 +94,14 @@ std::ostringstream TransportCatalogue::RouteInfo(const std::string& name) const 
         << roat_distance << " route length, "
         << roat_distance/geographical_distance << " curvature";
     return out;
+}
+ */
+const RoutesName& TransportCatalogue::GetAllRoutes() const {
+    return routes_name_;
+}
 
+const StopsName& TransportCatalogue::GetAllStops() const {
+    return stops_name_;
 }
 
 void TransportCatalogue::SetRoadDistanceBetweenStops(const domain::Stop& stop_from, const domain::Stop& stop_to, double distance) {
@@ -110,13 +122,46 @@ double TransportCatalogue::GetGeographicalDistanceBetweenStops(const domain::Sto
 }
 
 double TransportCatalogue::GetRoadDistanceBetweenStops(const domain::Stop& stop_from, const domain::Stop& stop_to) const {
-    std::pair<const domain::Stop *, const domain::Stop *> tmp_pair;
-    tmp_pair.first = &stop_from;
-    tmp_pair.second = &stop_to;
-    if (road_distance_.count(tmp_pair)) {
-        return road_distance_.at(tmp_pair);
+    std::pair<const domain::Stop *, const domain::Stop *> forward_direction = {&stop_from, &stop_to};
+    std::pair<const domain::Stop *, const domain::Stop *> reverse_direction = {&stop_to, &stop_from};
+    if (road_distance_.count(forward_direction)) {
+        return road_distance_.at(forward_direction);
+    } else if (road_distance_.count(reverse_direction)) {
+        return road_distance_.at(reverse_direction);
+    } else {
+        throw std::logic_error(std::string("can't find the distance between these stops"));
     }
     return 0.0;
+}
+
+bool TransportCatalogue::GetIsRoundTrip(std::string_view route_name) const {
+    return is_round_trip_.at(route_name);
+}
+
+TransportCatalogue::RouteInfo TransportCatalogue::GetRouteInfo(std::string_view route_name) const {
+    RouteInfo route_info;
+    const auto& route = FindRoute(route_name);
+    route_info.first_stop = (route->stops.front())->stop_name;
+    if (GetIsRoundTrip(route_name)) {
+        route_info.is_round_trip = true;
+    } else {
+        route_info.is_round_trip = false;
+        size_t middle_stop = route->stops.size() / 2;
+        route_info.end_stop = route->stops.at(middle_stop)->stop_name;
+    }
+    return route_info;
+}
+
+void TransportCatalogue::SetBusWaitTime(double time) {
+    routing_settings_.bus_wait_time = time;
+}
+void TransportCatalogue::SetBusVelocity(double velocity) {
+    routing_settings_.bus_velocity = velocity;
+    routing_settings_.bus_speed_in_m_min = velocity * 1000.0 / 60.0;
+}
+
+const TransportCatalogue::RoutingSettings& TransportCatalogue::GetRoutingSettings() const {
+    return routing_settings_;
 }
 
 } // namespace transport_catalogue

@@ -3,8 +3,8 @@
 // подключаем ""s
 using std::literals::string_literals::operator""s;
 
-void ProcessingBaseRequestStop(request_handler::BaseRequests& query, const json::Dict& stop) {
-    query.type = request_handler::BaseRequests::QueryType::STOP;
+void ProcessingBaseRequestStop(json_reader::jsonReader::BaseRequests& query, const json::Dict& stop) {
+    query.type = json_reader::jsonReader::BaseRequests::QueryType::STOP;
     query.name = stop.at("name"s).AsString();
     query.coordinates = {stop.at("latitude"s).AsDouble(), stop.at("longitude"s).AsDouble()};
     // если имеется расстояние в метрах
@@ -19,7 +19,7 @@ void ProcessingBaseRequestStop(request_handler::BaseRequests& query, const json:
     }
 }
 
-void ProcessingBaseRequestBus(request_handler::BaseRequests& query, const json::Dict& bus) {
+void ProcessingBaseRequestBus(json_reader::jsonReader::BaseRequests& query, const json::Dict& bus) {
     query.name = bus.at("name"s).AsString();
     // получаем остановки из базы данных
     const auto& stops = bus.at("stops"s).AsArray();
@@ -29,7 +29,7 @@ void ProcessingBaseRequestBus(request_handler::BaseRequests& query, const json::
     }
     // если маршрут прямой
     if (!(bus.at("is_roundtrip"s).AsBool())) {
-        query.type = request_handler::BaseRequests::QueryType::BUS_LINE;
+        query.type = json_reader::jsonReader::BaseRequests::QueryType::BUS_LINE;
         // добавляем обратный маршрут
         query.stops.resize(query.stops.size() * 2 - 1);
         size_t route_size = query.stops.size();
@@ -37,16 +37,16 @@ void ProcessingBaseRequestBus(request_handler::BaseRequests& query, const json::
             query.stops.at(route_size - 1 - i) = query.stops.at(i);
         }
     } else {
-        query.type = request_handler::BaseRequests::QueryType::BUS_ROUTE;
+        query.type = json_reader::jsonReader::BaseRequests::QueryType::BUS_ROUTE;
     }
 
 }
 
-void json_reader::jsonReader::ReadBaseRequests(const json::Document& doc, request_handler::RequestHandler& rh) {
+std::vector<json_reader::jsonReader::BaseRequests> json_reader::jsonReader::ReadBaseRequests(const json::Document& doc) {
     // вычисляем количество запросов на обновление базы
     size_t query_count = doc.GetRoot().AsMap().at("base_requests").AsArray().size();
     // создаем базу запросов
-    auto& base_requests = rh.GetBaseRequests();
+    std::vector<BaseRequests> base_requests;
     base_requests.resize(query_count);
     // обрабатываем запросы
     for (size_t i = 0; i < query_count; ++i) {
@@ -59,24 +59,38 @@ void json_reader::jsonReader::ReadBaseRequests(const json::Document& doc, reques
             ProcessingBaseRequestStop(base_requests.at(i), query);
         }
     }
+    return base_requests;
 }
 
-void ProcessingStatRequestStop(request_handler::StatRequests& query, const json::Dict& stop) {
+void ProcessingStatRequestStop(request_handler::StatRequests& query, const json::Dict& Request) {
     query.type = request_handler::StatRequests::QueryType::STOP;
-    query.id = stop.at("id").AsInt();
-    query.name = stop.at("name").AsString();
+    query.id = Request.at("id").AsInt();
+    query.name = Request.at("name").AsString();
 }
 
-void ProcessingStatRequestBus(request_handler::StatRequests& query, const json::Dict& stop) {
+void ProcessingStatRequestBus(request_handler::StatRequests& query, const json::Dict& Request) {
     query.type = request_handler::StatRequests::QueryType::BUS;
-    query.id = stop.at("id").AsInt();
-    query.name = stop.at("name").AsString();
+    query.id = Request.at("id").AsInt();
+    query.name = Request.at("name").AsString();
 }
 
-void ProcessingStatRequestMap(request_handler::StatRequests& query, const json::Dict& stop) {
+void ProcessingStatRequestMap(request_handler::StatRequests& query, const json::Dict& Request) {
     query.type = request_handler::StatRequests::QueryType::MAP;
+    query.id = Request.at("id").AsInt();
+}
+
+void ProcessingStatRequestRoute(request_handler::StatRequests& query, const json::Dict& Request) {
+    query.type = request_handler::StatRequests::QueryType::ROUTE;
+    query.id = Request.at("id").AsInt();
+    query.route = {Request.at("from").AsString(), Request.at("to").AsString()};
+}
+
+
+void ProcessingStatRequestUnknownType(request_handler::StatRequests& query, const json::Dict& stop) {
+    query.type = request_handler::StatRequests::QueryType::UNKNOWN_TYPE;
     query.id = stop.at("id").AsInt();
 }
+
 
 void json_reader::jsonReader::ReadStatRequests(const json::Document& doc, request_handler::RequestHandler& rh) {
     // вычисляем количество запросов к базе данных
@@ -93,8 +107,18 @@ void json_reader::jsonReader::ReadStatRequests(const json::Document& doc, reques
             ProcessingStatRequestBus(stat_requests.at(i), query);
         } else if (query.at("type").AsString() == "Map"s) {
             ProcessingStatRequestMap(stat_requests.at(i), query);
+        } else if (query.at("type").AsString() == "Route"s) {
+            ProcessingStatRequestRoute(stat_requests.at(i), query);
+        } else {
+            ProcessingStatRequestUnknownType(stat_requests.at(i), query);
         }
     }
+}
+
+void json_reader::jsonReader::ReadRoutingSettings(const json::Document& doc, transport_catalogue::TransportCatalogue& data) {
+    const auto& routing_settings = doc.GetRoot().AsMap().at("routing_settings"s).AsMap();
+    data.SetBusWaitTime(routing_settings.at("bus_wait_time").AsInt());
+    data.SetBusVelocity(routing_settings.at("bus_velocity").AsInt());
 }
 
 void InsertColor(svg::Color& color, const json::Node& node) {
@@ -183,24 +207,28 @@ void json_reader::jsonReader::ReadStopAndBus(const json::Document& doc, map_rend
     }
 }
 
-void UpdateDatabase(const std::vector<request_handler::BaseRequests>& queries, transport_catalogue::TransportCatalogue& data) {
+void UpdateDatabase(const std::vector<json_reader::jsonReader::BaseRequests>& queries, transport_catalogue::TransportCatalogue& data) {
     // сначала добавляем остановки
     for (auto& query : queries) {
-        if (query.type != request_handler::BaseRequests::QueryType::STOP) {
+        if (query.type != json_reader::jsonReader::BaseRequests::QueryType::STOP) {
             continue;
         }
         data.AddStop(query.name, query.coordinates);
     }
     // добавляем маршруты
     for (auto& query : queries) {
-        if (query.type == request_handler::BaseRequests::QueryType::STOP) {
+        if (query.type == json_reader::jsonReader::BaseRequests::QueryType::STOP) {
             continue;
         }
-        data.AddRoute(query.name, query.stops);
+        bool is_round_trip = false;
+        if (query.type == json_reader::jsonReader::BaseRequests::QueryType::BUS_ROUTE) {
+            is_round_trip = true;
+        }
+        data.AddRoute(query.name, query.stops, is_round_trip);
     }
     // добавляем дистанцию между маршрутами
     for (auto& query : queries) {
-        if (query.type != request_handler::BaseRequests::QueryType::STOP) {
+        if (query.type != json_reader::jsonReader::BaseRequests::QueryType::STOP) {
             continue;
         }
         for (auto& [from_to, distance] : query.road_distance_to_stop) {
@@ -213,20 +241,17 @@ void UpdateDatabase(const std::vector<request_handler::BaseRequests>& queries, t
     }
 }
 
-void json_reader::jsonReader::ReadJson(const json::Document& doc, 
-                                        transport_catalogue::TransportCatalogue& data, 
-                                        request_handler::RequestHandler& rh, 
-                                        map_renderer::MapRenderer& mr) {
-    ReadBaseRequests(doc, rh);
-    ReadStatRequests(doc, rh);
+json_reader::jsonReader::jsonReader(const json::Document& doc,
+                transport_catalogue::TransportCatalogue& data,
+                map_renderer::MapRenderer& mr) {
+    std::vector<BaseRequests> b_r = ReadBaseRequests(doc);
     ReadMapSettings(doc, mr);
     ReadStopAndBus(doc, mr);
-    UpdateDatabase(rh.GetBaseRequests(), data);
+    ReadRoutingSettings(doc, data);
+    UpdateDatabase(b_r, data);
 }
 
-json_reader::jsonReader::jsonReader(const json::Document& doc, 
-                                        transport_catalogue::TransportCatalogue& data, 
-                                        request_handler::RequestHandler& rh, 
-                                        map_renderer::MapRenderer& mr) {
-    ReadJson(doc, data, rh, mr);
+json_reader::jsonReader::jsonReader(const json::Document& doc,
+                request_handler::RequestHandler& rh) {
+    ReadStatRequests(doc, rh);
 }
