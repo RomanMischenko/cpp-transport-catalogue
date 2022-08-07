@@ -2,7 +2,7 @@
 
 namespace transport_router {
 
-TransportRouter::TransportRouter(const Data& data) 
+TransportRouter::TransportRouter(const TransportCatalogue& data) 
 : data_(data)
 , graph_(data.GetAllStops().size() * 2)
 {}
@@ -48,6 +48,42 @@ void TransportRouter::AddEdge(std::string_view stop_from
     }
 }
 
+void TransportRouter::AddEdgeBetweenOneStop(std::string_view stop_name
+                                          , std::string_view route_name) {
+    size_t stop_id_1 = stops_id_by_name_in_graph_.at(stop_name).first;
+    size_t stop_id_2 = stops_id_by_name_in_graph_.at(stop_name).second;
+    Weight weight_between_one_stop;
+    weight_between_one_stop.from = stop_name;
+    weight_between_one_stop.to = stop_name;
+    weight_between_one_stop.route_name = route_name;
+    weight_between_one_stop.travel_time = 0;
+    weight_between_one_stop.wait_time = data_.GetRoutingSettings().bus_wait_time;
+    weight_between_one_stop.stops_in_way_count = 0;
+    graph_.AddEdge({stop_id_1, stop_id_2, weight_between_one_stop});
+}
+
+void TransportRouter::AddEdgeBetweenTwoStop(std::string_view stop_from
+                                          , std::string_view stop_to
+                                          , std::string_view route_name
+                                          , size_t stops_in_way_count
+                                          , double dist_between_stops) {
+    size_t stop_id_from = stops_id_by_name_in_graph_.at(stop_from).second;
+    size_t stop_id_to = stops_id_by_name_in_graph_.at(stop_to).first;
+    // время в пути между ними
+    double travel_time_between_stops = dist_between_stops 
+                                        / data_.GetRoutingSettings().bus_speed_in_m_min;
+
+    Weight weight_between_two_stops;
+    weight_between_two_stops.from = stop_from;
+    weight_between_two_stops.to = stop_to;
+    weight_between_two_stops.route_name = route_name;
+    weight_between_two_stops.travel_time = travel_time_between_stops;
+    weight_between_two_stops.wait_time = 0;
+    weight_between_two_stops.stops_in_way_count = stops_in_way_count;
+                
+    graph_.AddEdge({stop_id_from, stop_id_to, weight_between_two_stops});
+}
+
 void TransportRouter::BuildGraph() {
     const auto& all_stops = data_.GetAllStops();
     const auto& all_routes = data_.GetAllRoutes();
@@ -58,7 +94,7 @@ void TransportRouter::BuildGraph() {
         size_t stop_id_1 = stop_id++;
         size_t stop_id_2 = stop_id++;
         stops_id_by_name_in_graph_.emplace(stop_name, std::pair{stop_id_1, stop_id_2});
-        AddEdge(stop_name, stop_name, std::string_view("between_stops"), 0, 0);
+        AddEdgeBetweenOneStop(stop_name, std::string_view("between_stops"));
     }
     // добавляем ребра
     for (const auto& [route_name, route] : all_routes) {
@@ -91,7 +127,7 @@ void TransportRouter::BuildGraph() {
                             stops_in_route.at(end_stop_index)->stop_name
                     ));
                     size_t stops_in_way_count = end_stop_index - start_stop_index;
-                    AddEdge(stop_name_from, stop_name_to, route_name, stops_in_way_count, dist_between_stops);
+                    AddEdgeBetweenTwoStop(stop_name_from, stop_name_to, route_name, stops_in_way_count, dist_between_stops);
                 }
             }
         } else {
@@ -111,7 +147,7 @@ void TransportRouter::BuildGraph() {
                             stops_in_route.at(end_stop_index)->stop_name
                     ));
                     size_t stops_in_way_count = end_stop_index - start_stop_index;
-                    AddEdge(stop_name_from, stop_name_to, route_name, stops_in_way_count, dist_between_stops);
+                    AddEdgeBetweenTwoStop(stop_name_from, stop_name_to, route_name, stops_in_way_count, dist_between_stops);
                 }
             }
             // добавляем обратный маршрут
@@ -129,7 +165,7 @@ void TransportRouter::BuildGraph() {
                             stops_in_route.at(end_stop_index)->stop_name
                     ));
                     size_t stops_in_way_count = end_stop_index - middle_stop_index;
-                    AddEdge(stop_name_from, stop_name_to, route_name, stops_in_way_count, dist_between_stops);
+                    AddEdgeBetweenTwoStop(stop_name_from, stop_name_to, route_name, stops_in_way_count, dist_between_stops);
                 }
             }
         }

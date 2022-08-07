@@ -8,11 +8,11 @@
 namespace transport_router {
 
 class TransportRouter {
-    using Data = transport_catalogue::TransportCatalogue;
+    using TransportCatalogue = transport_catalogue::TransportCatalogue;
     using StopsID = std::unordered_map<std::string_view, std::pair<size_t, size_t>>;
 public:
     TransportRouter() = delete;
-    TransportRouter(const Data&);
+    TransportRouter(const TransportCatalogue&);
 
     struct Weight {
         std::string_view from;
@@ -31,11 +31,18 @@ public:
     graph::Router<Weight> BuildRouter() const;
 
 private:
-    const Data& data_;
+    const TransportCatalogue& data_;
     graph::DirectedWeightedGraph<Weight> graph_;
     StopsID stops_id_by_name_in_graph_;
     
-
+    void AddEdgeBetweenOneStop(std::string_view stop_name
+                             , std::string_view route_name);
+    void AddEdgeBetweenTwoStop(std::string_view stop_from
+                             , std::string_view stop_to
+                             , std::string_view route_name
+                             , size_t stops_in_way_count
+                             , double dist_between_stops);
+    
     void AddEdge(std::string_view stop_from
                 , std::string_view stop_to
                 , std::string_view route_name
@@ -43,17 +50,17 @@ private:
                 , double dist_between_stops);
 };
 
-inline bool operator<(TransportRouter::Weight lhs, TransportRouter::Weight rhs) {
+inline bool operator<(const TransportRouter::Weight& lhs, const TransportRouter::Weight& rhs) {
     double lhs_total_time = lhs.travel_time + lhs.wait_time;
     double rhs_total_time = rhs.travel_time + rhs.wait_time;
     return lhs_total_time < rhs_total_time ? true : false;
 }
 
-inline bool operator>(TransportRouter::Weight lhs, TransportRouter::Weight rhs) {
+inline bool operator>(const TransportRouter::Weight& lhs, const TransportRouter::Weight& rhs) {
     return !(lhs < rhs);
 }
 
-inline TransportRouter::Weight operator+(TransportRouter::Weight lhs, TransportRouter::Weight rhs) {
+inline TransportRouter::Weight operator+(const TransportRouter::Weight& lhs, const TransportRouter::Weight& rhs) {
     TransportRouter::Weight tmp;
     tmp.travel_time = lhs.travel_time + rhs.travel_time;
     tmp.wait_time = lhs.wait_time + rhs.wait_time;
