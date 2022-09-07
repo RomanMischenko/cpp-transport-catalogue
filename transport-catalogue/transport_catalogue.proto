@@ -13,17 +13,12 @@ message Coordinates {
 message Stop {
     Coordinates stop_coordinates = 1;
     string stop_name = 2;
-    repeated string road_distances_stop_name = 3;
-    repeated uint64 distances_between_stops = 4;
-    string stop_type = 5; // убрать
-    
 }
 
 message Route {
     bool is_round_trip = 1;
     string route_name = 2;
     repeated string stops_in_route = 3;
-    string route_type = 4; // убрать
 }
 
 message TransportCatalogueProto {
@@ -34,5 +29,5 @@ message TransportCatalogueProto {
 
     repeated string road_distances_stop_name_from = 5;
     repeated string road_distances_stop_name_to = 6;
-    repeated uint64 distances_between_stops_proto = 7;
+    repeated uint64 distances_between_stops = 7;
 }

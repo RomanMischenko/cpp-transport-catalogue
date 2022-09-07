@@ -51,13 +51,16 @@ int main(int argc, char* argv[]) {
         // распаковываем файл
         optional<transport_catalogue_proto::TransportCatalogueProto> proto = Deserialize(path);
 
-        ProcessRequests process_requests(proto.value());
-        const auto [TC, MR] = process_requests.UnPack();
+        transport_catalogue::TransportCatalogue data;
+        map_renderer::MapRenderer mr;
+        ProcessRequests process_requests(proto.value(), data, mr);
+        process_requests.UnPack();
+        
         // создаем каталог маршрутов
-        transport_router::TransportRouter rt(TC);
+        transport_router::TransportRouter rt(data);
         rt.BuildGraph();
         // обрабатываем запросы к базе
-        request_handler::RequestHandler rh(TC, MR, rt);
+        request_handler::RequestHandler rh(data, mr, rt);
         json_reader::jsonReader jr(doc, rh);
 
         json::Document out = rh.DatabaseOutput();

@@ -32,8 +32,10 @@ private:
 class ProcessRequests {
 public:
     ProcessRequests() = delete;
-    ProcessRequests(const transport_catalogue_proto::TransportCatalogueProto&);
-    std::tuple<TC, MR> UnPack() const;
+    ProcessRequests(const transport_catalogue_proto::TransportCatalogueProto&, TC&, MR&);
+    void UnPack();
 private:
     const transport_catalogue_proto::TransportCatalogueProto& proto_;
+    TC& catalogue_;
+    MR& map_renderer_;
 };
