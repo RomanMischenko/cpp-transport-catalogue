@@ -2,6 +2,9 @@
 
 #include "json.h"
 
+#include <transport_catalogue.pb.h>
+#include <map_renderer.pb.h>
+
 #include <iostream>
 
 class Serializator {

@@ -1,11 +1,10 @@
 #include "serialization.h"
 #include "json_builder.h"
 
-#include <transport_catalogue.pb.h>
-#include <map_renderer.pb.h>
-
 #include <filesystem>
 #include <fstream>
+
+using std::literals::string_literals::operator""s;
 
 Serializator::Serializator(std::istream& input)
 : document_(json::Load(input))
@@ -26,14 +25,11 @@ void InsertColor(::transport_catalogue::Color* color, const json::Node& node) {
     }
 }
 
-void Serializator::Pack() const {
-    using std::literals::string_literals::operator""s;
+void PackBaseRequests(transport_catalogue::TransportCatalogueProto& proto, const json::Document doc) {
 
-    transport_catalogue::TransportCatalogueProto proto;
-
-    size_t query_count = document_.GetRoot().AsMap().at("base_requests"s).AsArray().size();
+    size_t query_count = doc.GetRoot().AsMap().at("base_requests"s).AsArray().size();
     for (size_t i = 0; i < query_count; ++i) {
-        const auto& query = document_.GetRoot().AsMap().at("base_requests"s).AsArray().at(i).AsMap();
+        const auto& query = doc.GetRoot().AsMap().at("base_requests"s).AsArray().at(i).AsMap();
         if (query.at("type"s).AsString() == "Bus"s) {
             ::transport_catalogue::Route* route = proto.add_routes_in_tc();
 
@@ -62,13 +58,12 @@ void Serializator::Pack() const {
             }
         }
     }
+}
 
-    query_count = document_.GetRoot().AsMap().at("render_settings"s).AsMap().size();
+void PackRenderSettings(transport_catalogue::TransportCatalogueProto& proto, const json::Document doc) {
+    size_t query_count = doc.GetRoot().AsMap().at("render_settings"s).AsMap().size();
 
-    for (size_t i = 0; i < query_count; ++i) {
-    }
-
-    const auto& query = document_.GetRoot().AsMap().at("render_settings"s).AsMap();
+    const auto& query = doc.GetRoot().AsMap().at("render_settings"s).AsMap();
     ::transport_catalogue::RenderSettings* render_settings = proto.mutable_render_settings();
 
     render_settings->set_width(query.at("width").AsDouble());
@@ -99,10 +94,19 @@ void Serializator::Pack() const {
     }
 
     ::transport_catalogue::RoutingSettings* router_setting = proto.mutable_router_setting();
-    const auto& query_routing_settings = document_.GetRoot().AsMap().at("routing_settings"s).AsMap();
+    const auto& query_routing_settings = doc.GetRoot().AsMap().at("routing_settings"s).AsMap();
     router_setting->set_bus_wait_time(query_routing_settings.at("bus_wait_time"s).AsInt());
     router_setting->set_bus_velocity(query_routing_settings.at("bus_velocity"s).AsInt());
+}
 
+void Serializator::Pack() const {
+
+    transport_catalogue::TransportCatalogueProto proto;
+
+    PackBaseRequests(proto, document_);
+    PackRenderSettings(proto, document_);
+
+    // сохраняем в файл
     const std::filesystem::path path = document_.GetRoot().AsMap().at("serialization_settings").AsMap().at("file").AsString();
     std::ofstream out_file(path, std::ios::binary);
     proto.SerializeToOstream(&out_file);
@@ -112,22 +116,7 @@ DeSerializator::DeSerializator(std::istream& input)
 : process_requests_(json::Load(input))
 {}
 
-json::Document DeSerializator::UnPack() const {
-    using std::literals::string_literals::operator""s;
-
-    transport_catalogue::TransportCatalogueProto proto;
-
-    const std::filesystem::path path = process_requests_.GetRoot().AsMap().at("serialization_settings").AsMap().at("file").AsString();
-    std::ifstream in_file(path, std::ios::binary);
-    if (!proto.ParseFromIstream(&in_file)) {
-        std::cerr << "Can't open file" << std::endl;
-        abort();
-    }
-
-    json::Builder builder;
-
-    builder.StartDict();
-
+void UnPackBaseRequests(json::Builder& builder, const transport_catalogue::TransportCatalogueProto& proto) {
     builder.Key("base_requests"s);
     builder.StartArray();
     // добавляем автобусы
@@ -168,7 +157,9 @@ json::Document DeSerializator::UnPack() const {
     }
 
     builder.EndArray(); // base_request
+}
 
+void UnPackRenderSettings(json::Builder& builder, const transport_catalogue::TransportCatalogueProto& proto) {
     const ::transport_catalogue::RenderSettings& render_setting = proto.render_settings();
 
     builder.Key("render_settings"s);
@@ -234,22 +225,39 @@ json::Document DeSerializator::UnPack() const {
     builder.EndArray(); // color_palette
 
     builder.EndDict(); // render_settings
+}
 
+void UnPackRoutingSettings(json::Builder& builder, const transport_catalogue::TransportCatalogueProto& proto) {
     builder.Key("routing_settings"s);
     const ::transport_catalogue::RoutingSettings& router_setting = proto.router_setting();
     builder.StartDict();
     builder.Key("bus_wait_time"s).Value(static_cast<int>(router_setting.bus_wait_time()));
     builder.Key("bus_velocity"s).Value(static_cast<int>(router_setting.bus_velocity()));
-
-
     builder.EndDict(); // routing_settings
+}
 
+json::Document DeSerializator::UnPack() const {
+    using std::literals::string_literals::operator""s;
+
+    transport_catalogue::TransportCatalogueProto proto;
+
+    const std::filesystem::path path = process_requests_.GetRoot().AsMap().at("serialization_settings").AsMap().at("file").AsString();
+    std::ifstream in_file(path, std::ios::binary);
+    if (!proto.ParseFromIstream(&in_file)) {
+        std::cerr << "Can't open file" << std::endl;
+        abort();
+    }
+
+    json::Builder builder;
+    builder.StartDict();
+
+    UnPackBaseRequests(builder, proto);
+    UnPackRenderSettings(builder, proto);
+    UnPackRoutingSettings(builder, proto);
+    
     builder.EndDict(); 
 
-    
-
     json::Document result(builder.Build());
-    //json::Print(result, std::cout);
     return result;
 }
 
