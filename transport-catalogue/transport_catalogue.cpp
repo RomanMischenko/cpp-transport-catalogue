@@ -8,8 +8,9 @@ namespace transport_catalogue {
 
 using RoutesName = std::unordered_map<std::string_view, domain::Route *>;
 using StopsName = std::unordered_map<std::string_view, domain::Stop *>;
+using Distance = std::unordered_map<std::pair<const domain::Stop *, const domain::Stop *>, double, detail::HasherWithStop>;
 
-void TransportCatalogue::AddRoute(std::string_view name, const std::vector<std::string>& stops, bool is_round_trip) {
+void TransportCatalogue::AddRoute(std::string name, const std::vector<std::string>& stops, bool is_round_trip) {
     // добавление маршрута
     domain::Route route;
     route.route_name = name;
@@ -40,7 +41,7 @@ void TransportCatalogue::AddRoute(std::string_view name, const std::vector<std::
     is_round_trip_.insert({last_added_route.route_name, is_round_trip});
 }
 
-void TransportCatalogue::AddStop(std::string_view name, const geo::Coordinates& coordinates) {
+void TransportCatalogue::AddStop(std::string name, const geo::Coordinates& coordinates) {
     stops_.push_back({std::string(name), coordinates});
     stops_name_.insert({stops_.back().stop_name, &stops_.back()});
 }
@@ -104,6 +105,10 @@ const StopsName& TransportCatalogue::GetAllStops() const {
     return stops_name_;
 }
 
+const Distance& TransportCatalogue::GetRoadDistance() const {
+    return road_distance_;
+}
+
 void TransportCatalogue::SetRoadDistanceBetweenStops(const domain::Stop& stop_from, const domain::Stop& stop_to, double distance) {
     std::pair<const domain::Stop *, const domain::Stop *> tmp_pair;
     tmp_pair.first = &stop_from;
@@ -162,6 +167,12 @@ void TransportCatalogue::SetBusVelocity(double velocity) {
 
 const TransportCatalogue::RoutingSettings& TransportCatalogue::GetRoutingSettings() const {
     return routing_settings_;
+}
+
+void TransportCatalogue::SetRoutingSettings(int bus_wait_time, int bus_velocity, double bus_speed_in_m_min) {
+    routing_settings_.bus_wait_time = bus_wait_time;
+    routing_settings_.bus_velocity = bus_velocity;
+    routing_settings_.bus_speed_in_m_min = bus_speed_in_m_min;
 }
 
 } // namespace transport_catalogue

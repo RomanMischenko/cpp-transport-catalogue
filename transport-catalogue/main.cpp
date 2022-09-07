@@ -4,10 +4,23 @@
 #include "request_handler.h"
 #include "transport_router.h"
 
+#include <optional>
+
 using namespace std;
 
 void PrintUsage(std::ostream& stream = std::cerr) {
     stream << "Usage: transport_catalogue [make_base|process_requests]\n"s;
+}
+
+optional<transport_catalogue_proto::TransportCatalogueProto> Deserialize(const filesystem::path& path) {
+    ifstream in_file(path, ios::binary);
+    transport_catalogue_proto::TransportCatalogueProto proto;
+    if (!proto.ParseFromIstream(&in_file)) {
+        return nullopt;
+    }
+
+    // тут нужен move, поскольку возвращается другой тип
+    return {move(proto)};
 }
 
 int main(int argc, char* argv[]) {
@@ -19,30 +32,37 @@ int main(int argc, char* argv[]) {
     const std::string mode(argv[1]);
 
     if (mode == "make_base"s) {
-
-        Serializator ser(std::cin);
-        ser.Pack();
-
-    } else if (mode == "process_requests"s) {
-
-        DeSerializator de_ser(std::cin);
-        json::Document base_request = de_ser.UnPack();
-        
-        const json::Document& process_request = de_ser.GetProcessRequests();
-        std::cerr << "read is OK"s << std::endl;
+        json::Document doc = json::Load(std::cin);
         // создаем транспортный справочник
         transport_catalogue::TransportCatalogue data;
         map_renderer::MapRenderer mr;
-        json_reader::jsonReader jr_1(base_request, data, mr);
+        json_reader::jsonReader jr_1(doc, data, mr);
+
+        // сохраняем в файл
+        const std::filesystem::path path = doc.GetRoot().AsMap().at("serialization_settings").AsMap().at("file").AsString();
+        std::ofstream out_file(path, std::ios::binary);
+        MakeBase make_base(data, mr);
+        transport_catalogue_proto::TransportCatalogueProto proto = make_base.Pack();
+        proto.SerializeToOstream(&out_file);
+
+    } else if (mode == "process_requests"s) {
+        json::Document doc = json::Load(std::cin);
+        const std::filesystem::path path = doc.GetRoot().AsMap().at("serialization_settings").AsMap().at("file").AsString();
+        // распаковываем файл
+        optional<transport_catalogue_proto::TransportCatalogueProto> proto = Deserialize(path);
+
+        ProcessRequests process_requests(proto.value());
+        const auto [TC, MR] = process_requests.UnPack();
         // создаем каталог маршрутов
-        transport_router::TransportRouter rt(data);
+        transport_router::TransportRouter rt(TC);
         rt.BuildGraph();
         // обрабатываем запросы к базе
-        request_handler::RequestHandler rh(data, mr, rt);
-        json_reader::jsonReader jr_2(process_request, rh);
+        request_handler::RequestHandler rh(TC, MR, rt);
+        json_reader::jsonReader jr(doc, rh);
+
         json::Document out = rh.DatabaseOutput();
         json::Print(out, std::cout);
- 
+        return 0;
     } else {
         PrintUsage();
         return 1;

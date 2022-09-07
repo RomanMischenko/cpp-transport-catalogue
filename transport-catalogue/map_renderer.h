@@ -30,6 +30,7 @@ public:
     void Draw(std::ostream& out) const;
 
     MapSettings& GetMapSettings();
+    const MapSettings& GetMapSettings() const;
     std::unordered_map<std::string, geo::Coordinates>& GetStops();
     std::map<std::string, std::vector<std::string>>& GetBuses();
     std::unordered_map<std::string, bool>& GetIsRoundTrip();

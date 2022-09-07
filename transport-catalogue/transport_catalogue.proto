@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package transport_catalogue;
+package transport_catalogue_proto;
 
 import "map_renderer.proto";
 import "transport_router.proto";
@@ -15,14 +15,15 @@ message Stop {
     string stop_name = 2;
     repeated string road_distances_stop_name = 3;
     repeated uint64 distances_between_stops = 4;
-    string stop_type = 5;
+    string stop_type = 5; // убрать
+    
 }
 
 message Route {
     bool is_round_trip = 1;
     string route_name = 2;
     repeated string stops_in_route = 3;
-    string route_type = 4;
+    string route_type = 4; // убрать
 }
 
 message TransportCatalogueProto {
@@ -30,4 +31,8 @@ message TransportCatalogueProto {
     repeated Route routes_in_tc = 2;
     RenderSettings render_settings = 3;
     RoutingSettings router_setting = 4;
+
+    repeated string road_distances_stop_name_from = 5;
+    repeated string road_distances_stop_name_to = 6;
+    repeated uint64 distances_between_stops_proto = 7;
 }

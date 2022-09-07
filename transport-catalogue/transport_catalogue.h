@@ -29,6 +29,7 @@ class TransportCatalogue {
 public:
     using RoutesName = std::unordered_map<std::string_view, domain::Route *>;
     using StopsName = std::unordered_map<std::string_view, domain::Stop *>;
+    using Distance = std::unordered_map<std::pair<const domain::Stop *, const domain::Stop *>, double, detail::HasherWithStop>;
 
     struct RoutingSettings {
         int bus_wait_time = 0;
@@ -42,14 +43,15 @@ public:
         std::optional<std::string_view> end_stop;
     };
 
-    void AddRoute(std::string_view name, const std::vector<std::string>& stops, bool is_round_trip);
-    void AddStop(std::string_view name, const geo::Coordinates& coordinates);
+    void AddRoute(std::string name, const std::vector<std::string>& stops, bool is_round_trip);
+    void AddStop(std::string name, const geo::Coordinates& coordinates);
 
     domain::Route* FindRoute(std::string_view name) const;
     domain::Stop* FindStop(std::string_view name) const;
 
     const RoutesName& GetAllRoutes() const;
     const StopsName& GetAllStops() const;
+    const Distance& GetRoadDistance() const;
 
     //std::ostringstream RouteInfo(const std::string& name) const;
   
@@ -66,6 +68,7 @@ public:
     void SetBusVelocity(double velocity);
 
     const RoutingSettings& GetRoutingSettings() const;
+    void SetRoutingSettings(int bus_wait_time, int bus_velocity, double bus_speed_in_m_min);
 
 private:
     std::deque<domain::Route> routes_;
@@ -74,8 +77,8 @@ private:
     std::deque<domain::Stop> stops_;
     StopsName stops_name_;
 
-    std::unordered_map<std::pair<const domain::Stop *, const domain::Stop *>, double, detail::HasherWithStop> geographical_distance_;
-    std::unordered_map<std::pair<const domain::Stop *, const domain::Stop *>, double, detail::HasherWithStop> road_distance_;
+    Distance geographical_distance_;
+    Distance road_distance_;
 
     std::unordered_map<std::string_view, bool> is_round_trip_;
 

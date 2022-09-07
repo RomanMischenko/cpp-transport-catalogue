@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package transport_catalogue;
+package transport_catalogue_proto;
 
 message Color {
     string color_string = 1;

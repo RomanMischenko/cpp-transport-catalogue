@@ -1,8 +1,9 @@
 syntax = "proto3";
 
-package transport_catalogue;
+package transport_catalogue_proto;
 
 message RoutingSettings {
     uint32 bus_wait_time = 1;
     uint32 bus_velocity = 2;
+    double bus_speed_in_m_min = 3;
 }

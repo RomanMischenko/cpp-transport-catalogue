@@ -5,22 +5,35 @@
 #include <transport_catalogue.pb.h>
 #include <map_renderer.pb.h>
 
-#include <iostream>
+#include "transport_catalogue.h"
+#include "map_renderer.h"
 
-class Serializator {
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+#include <tuple>
+
+using TC = transport_catalogue::TransportCatalogue;
+using MR = map_renderer::MapRenderer;
+
+class MakeBase {
 public:
-    Serializator(std::istream& input);
-    void Pack() const;
+    MakeBase() = delete;
+    MakeBase(const TC& tc, const MR& mr);
+    transport_catalogue_proto::TransportCatalogueProto Pack();
+    void PackInFile(const std::filesystem::path&) const;
 
 private:
-    json::Document document_;
+    TC catalogue_;
+    MR map_renderer_;
+    transport_catalogue_proto::TransportCatalogueProto proto_;
 };
 
-class DeSerializator {
+class ProcessRequests {
 public:
-    DeSerializator(std::istream& input);
-    json::Document UnPack() const;
-    const json::Document& GetProcessRequests() const;
+    ProcessRequests() = delete;
+    ProcessRequests(const transport_catalogue_proto::TransportCatalogueProto&);
+    std::tuple<TC, MR> UnPack() const;
 private:
-    json::Document process_requests_;
+    const transport_catalogue_proto::TransportCatalogueProto& proto_;
 };

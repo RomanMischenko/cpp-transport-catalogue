@@ -1,11 +1,15 @@
 # cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH=/home/roman/protobuf/package
 # cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/home/roman/protobuf/package
 
+# cmake .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_PREFIX_PATH=/mnt/c/Users/toguk/protobuf/package
+# cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=/mnt/c/Users/toguk/protobuf/package
+
 cmake_minimum_required(VERSION 3.10)
 
 project(TransportCatalogue CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_PREFIX_PATH /home/roman/protobuf/package)
+#set(CMAKE_PREFIX_PATH /mnt/c/Users/toguk/protobuf/package)
 
 # Эта команда найдёт собранный нами пакет Protobuf.
 # REQUIRED означает, что библиотека обязательна.

@@ -1,266 +1,216 @@
 #include "serialization.h"
-#include "json_builder.h"
-
-#include <filesystem>
-#include <fstream>
 
 using std::literals::string_literals::operator""s;
 
-Serializator::Serializator(std::istream& input)
-: document_(json::Load(input))
+MakeBase::MakeBase(const transport_catalogue::TransportCatalogue& catalogue
+                , const map_renderer::MapRenderer& map_renderer) 
+: catalogue_(catalogue)
+, map_renderer_(map_renderer)
 {}
 
-void InsertColor(::transport_catalogue::Color* color, const json::Node& node) {
-    if (node.IsString()) {
-        color->set_color_string(node.AsString());
-    } else if (node.AsArray().size() == 3) {
-        color->set_color_r(node.AsArray().at(0).AsInt());
-        color->set_color_g(node.AsArray().at(1).AsInt());
-        color->set_color_b(node.AsArray().at(2).AsInt());
-    } else if (node.AsArray().size() == 4) {
-        color->set_color_r(node.AsArray().at(0).AsInt());
-        color->set_color_g(node.AsArray().at(1).AsInt());
-        color->set_color_b(node.AsArray().at(2).AsInt());
-        color->set_color_a(node.AsArray().at(3).AsDouble());
-    }
-}
-
-void PackBaseRequests(transport_catalogue::TransportCatalogueProto& proto, const json::Document doc) {
-
-    size_t query_count = doc.GetRoot().AsMap().at("base_requests"s).AsArray().size();
-    for (size_t i = 0; i < query_count; ++i) {
-        const auto& query = doc.GetRoot().AsMap().at("base_requests"s).AsArray().at(i).AsMap();
-        if (query.at("type"s).AsString() == "Bus"s) {
-            ::transport_catalogue::Route* route = proto.add_routes_in_tc();
-
-            route->set_route_name(query.at("name"s).AsString());
-            route->set_is_round_trip(query.at("is_roundtrip"s).AsBool());
-            route->set_route_type("Bus"s);
-            const auto& stops = query.at("stops"s).AsArray();
-            for (const auto& stop : stops) {
-                route->add_stops_in_route(stop.AsString());
-            }
-        } else {
-            ::transport_catalogue::Stop* stop = proto.add_stops_in_tc();
-            ::transport_catalogue::Coordinates* coord = stop->mutable_stop_coordinates();
-            
-            coord->set_latitude(query.at("latitude"s).AsDouble());
-            coord->set_longitude(query.at("longitude"s).AsDouble());
-            stop->set_stop_name(query.at("name"s).AsString());
-            stop->set_stop_type("Stop"s);
-
-            if (query.count("road_distances"s)) {
-                const auto& road_distances = query.at("road_distances"s).AsMap();
-                for (const auto& [stop_name, distance] : road_distances) {
-                    stop->add_road_distances_stop_name(stop_name);
-                    stop->add_distances_between_stops(distance.AsInt());
-                }
-            }
-        }
-    }
-}
-
-void PackRenderSettings(transport_catalogue::TransportCatalogueProto& proto, const json::Document doc) {
-    size_t query_count = doc.GetRoot().AsMap().at("render_settings"s).AsMap().size();
-
-    const auto& query = doc.GetRoot().AsMap().at("render_settings"s).AsMap();
-    ::transport_catalogue::RenderSettings* render_settings = proto.mutable_render_settings();
-
-    render_settings->set_width(query.at("width").AsDouble());
-    render_settings->set_height(query.at("height").AsDouble());
-
-    render_settings->set_padding(query.at("padding").AsDouble());
-
-    render_settings->set_stop_radius(query.at("stop_radius").AsDouble());
-    render_settings->set_line_width(query.at("line_width").AsDouble());
-
-    render_settings->set_bus_label_font_size(query.at("bus_label_font_size").AsInt());
-    render_settings->set_bus_label_offset_dx(query.at("bus_label_offset").AsArray().at(0).AsDouble());
-    render_settings->set_bus_label_offset_dy(query.at("bus_label_offset").AsArray().at(1).AsDouble());
-
-    render_settings->set_stop_label_font_size(query.at("stop_label_font_size").AsInt());
-    render_settings->set_stop_label_offset_dx(query.at("stop_label_offset").AsArray().at(0).AsDouble());
-    render_settings->set_stop_label_offset_dy(query.at("stop_label_offset").AsArray().at(1).AsDouble());
-
-    InsertColor(render_settings->mutable_underlayer_color(), query.at("underlayer_color"));
-
-    render_settings->set_underlayer_width(query.at("underlayer_width").AsDouble());
-
-    const size_t color_size = query.at("color_palette").AsArray().size();
-    const auto& colors = query.at("color_palette").AsArray();
-    for (size_t i = 0; i < color_size; ++i) {
-        ::transport_catalogue::Color* new_color_in_palette = render_settings->add_color_palette();
-        InsertColor(new_color_in_palette, colors.at(i));
-    }
-
-    ::transport_catalogue::RoutingSettings* router_setting = proto.mutable_router_setting();
-    const auto& query_routing_settings = doc.GetRoot().AsMap().at("routing_settings"s).AsMap();
-    router_setting->set_bus_wait_time(query_routing_settings.at("bus_wait_time"s).AsInt());
-    router_setting->set_bus_velocity(query_routing_settings.at("bus_velocity"s).AsInt());
-}
-
-void Serializator::Pack() const {
-
-    transport_catalogue::TransportCatalogueProto proto;
-
-    PackBaseRequests(proto, document_);
-    PackRenderSettings(proto, document_);
-
-    // сохраняем в файл
-    const std::filesystem::path path = document_.GetRoot().AsMap().at("serialization_settings").AsMap().at("file").AsString();
-    std::ofstream out_file(path, std::ios::binary);
-    proto.SerializeToOstream(&out_file);
-}
-
-DeSerializator::DeSerializator(std::istream& input) 
-: process_requests_(json::Load(input))
-{}
-
-void UnPackBaseRequests(json::Builder& builder, const transport_catalogue::TransportCatalogueProto& proto) {
-    builder.Key("base_requests"s);
-    builder.StartArray();
-    // добавляем автобусы
-    size_t routes_count = proto.routes_in_tc_size();
-    for (size_t i = 0; i < routes_count; ++i) {
-        const ::transport_catalogue::Route& route = proto.routes_in_tc(i);
-        builder.StartDict();
-        builder.Key("is_roundtrip"s).Value(route.is_round_trip());
-        builder.Key("name"s).Value(route.route_name());
-        builder.Key("type"s).Value(route.route_type());
-        builder.Key("stops"s).StartArray();
-        size_t stops_count = route.stops_in_route_size();
-        for (size_t index = 0; index < stops_count; ++index) {
-            builder.Value(route.stops_in_route(index));
-        }
-        builder.EndArray();
-        
-        builder.EndDict(); // route
-    }
+void PackStops(const transport_catalogue::TransportCatalogue& catalogue,
+                transport_catalogue_proto::TransportCatalogueProto& proto) {
     // добавляем остановки
+    for (const auto& stop_in_tc : catalogue.GetAllStops()) {
+        ::transport_catalogue_proto::Stop* new_stop_in_proto = proto.add_stops_in_tc();
+        ::transport_catalogue_proto::Coordinates* coord = new_stop_in_proto->mutable_stop_coordinates();
+        
+        const std::string_view stop_name = stop_in_tc.first;
+        const double lat = stop_in_tc.second->coordinates.lat;
+        const double lng = stop_in_tc.second->coordinates.lng;
+        
+        new_stop_in_proto->set_stop_name(std::string(stop_name));
+        coord->set_latitude(lat);
+        coord->set_longitude(lng);   
+    }
+    // добавляем дистацию между ними
+    for (const auto& dist : catalogue.GetRoadDistance()) {
+        const std::string_view stop_from = dist.first.first->stop_name;
+        const std::string_view stop_to = dist.first.second->stop_name;
+        const double dist_bw_stops = dist.second;
+        proto.add_road_distances_stop_name_from(std::string(stop_from));
+        proto.add_road_distances_stop_name_to(std::string(stop_to));
+        proto.add_distances_between_stops_proto(dist_bw_stops);
+    }
+}
+
+void PackRoutes(const transport_catalogue::TransportCatalogue& catalogue,
+                transport_catalogue_proto::TransportCatalogueProto& proto) {
+    for (const auto& route_in_tc : catalogue.GetAllRoutes()) {
+        ::transport_catalogue_proto::Route* new_route_in_proto = proto.add_routes_in_tc();
+
+        const std::string_view route_name = route_in_tc.first;
+        const bool is_round_trip = catalogue.GetIsRoundTrip(route_name);
+        
+        new_route_in_proto->set_route_name(std::string(route_name));
+        new_route_in_proto->set_is_round_trip(is_round_trip);
+
+        const auto& stops_in_tc = route_in_tc.second->stops;
+        for (const auto& stop_in_tc : stops_in_tc) {
+            new_route_in_proto->add_stops_in_route(std::string(stop_in_tc->stop_name));
+        }
+    }
+}
+
+void InsertColor(::transport_catalogue_proto::Color* color_proto, const svg::Color& color_mr) {
+    if (std::holds_alternative<std::string>(color_mr)) {
+        color_proto->set_color_string(std::get<std::string>(color_mr));
+    } else if (std::holds_alternative<svg::Rgb>(color_mr)) {
+        color_proto->set_color_r(std::get<svg::Rgb>(color_mr).red);
+        color_proto->set_color_g(std::get<svg::Rgb>(color_mr).green);
+        color_proto->set_color_b(std::get<svg::Rgb>(color_mr).blue);
+    } else if (std::holds_alternative<svg::Rgba>(color_mr)) {
+        color_proto->set_color_r(std::get<svg::Rgba>(color_mr).red);
+        color_proto->set_color_g(std::get<svg::Rgba>(color_mr).green);
+        color_proto->set_color_b(std::get<svg::Rgba>(color_mr).blue);
+        color_proto->set_color_a(std::get<svg::Rgba>(color_mr).opacity);
+    }
+}
+
+void PackRenderSettings(const map_renderer::MapRenderer& map_renderer,
+                transport_catalogue_proto::TransportCatalogueProto& proto) {
+    ::transport_catalogue_proto::RenderSettings* render_settings_in_proto = proto.mutable_render_settings();
+    const map_renderer::MapSettings& render_settings_in_mr = map_renderer.GetMapSettings();
+
+    render_settings_in_proto->set_width(render_settings_in_mr.width);
+    render_settings_in_proto->set_height(render_settings_in_mr.height);
+
+    render_settings_in_proto->set_padding(render_settings_in_mr.padding);
+
+    render_settings_in_proto->set_stop_radius(render_settings_in_mr.stop_radius);
+    render_settings_in_proto->set_line_width(render_settings_in_mr.line_width);
+
+    render_settings_in_proto->set_bus_label_font_size(render_settings_in_mr.bus_label_font_size);
+    render_settings_in_proto->set_bus_label_offset_dx(render_settings_in_mr.bus_label_offset.x);
+    render_settings_in_proto->set_bus_label_offset_dy(render_settings_in_mr.bus_label_offset.y);
+
+    render_settings_in_proto->set_stop_label_font_size(render_settings_in_mr.stop_label_font_size);
+    render_settings_in_proto->set_stop_label_offset_dx(render_settings_in_mr.stop_label_offset.x);
+    render_settings_in_proto->set_stop_label_offset_dy(render_settings_in_mr.stop_label_offset.y);
+
+    InsertColor(render_settings_in_proto->mutable_underlayer_color(), render_settings_in_mr.underlayer_color);
+
+    render_settings_in_proto->set_underlayer_width(render_settings_in_mr.underlayer_width);
+
+    const size_t color_palette_size = render_settings_in_mr.color_palette.size();
+    for (size_t i = 0; i < color_palette_size; ++i) {
+        ::transport_catalogue_proto::Color* new_color_in_palette = render_settings_in_proto->add_color_palette();
+        InsertColor(new_color_in_palette, render_settings_in_mr.color_palette.at(i));
+    }
+}
+
+void PackRoutingSettings(const transport_catalogue::TransportCatalogue& catalogue,
+                transport_catalogue_proto::TransportCatalogueProto& proto) {
+    ::transport_catalogue_proto::RoutingSettings* routint_setting_proto = proto.mutable_router_setting();
+    transport_catalogue::TransportCatalogue::RoutingSettings routint_setting_tc = catalogue.GetRoutingSettings();
+    routint_setting_proto->set_bus_wait_time(routint_setting_tc.bus_wait_time);
+    routint_setting_proto->set_bus_velocity(routint_setting_tc.bus_velocity);
+    routint_setting_proto->set_bus_speed_in_m_min(routint_setting_tc.bus_speed_in_m_min);
+}
+
+transport_catalogue_proto::TransportCatalogueProto MakeBase::Pack() {
+    PackStops(catalogue_, proto_);
+    PackRoutes(catalogue_, proto_);
+    PackRenderSettings(map_renderer_, proto_);
+    PackRoutingSettings(catalogue_, proto_);
+    return proto_;
+}
+
+ProcessRequests::ProcessRequests(const transport_catalogue_proto::TransportCatalogueProto& proto) 
+: proto_(proto)
+{}
+
+transport_catalogue::TransportCatalogue UnPackTC(const transport_catalogue_proto::TransportCatalogueProto& proto) {
+    transport_catalogue::TransportCatalogue catalogue;
+    // сначала добавляем остановки
     size_t stops_count = proto.stops_in_tc_size();
     for (size_t i = 0; i < stops_count; ++i) {
-        const ::transport_catalogue::Stop& stop = proto.stops_in_tc(i);
-        builder.StartDict();
-        builder.Key("latitude"s).Value(stop.stop_coordinates().latitude());
-        builder.Key("longitude"s).Value(stop.stop_coordinates().longitude());
-        builder.Key("name"s).Value(stop.stop_name());
-        builder.Key("type"s).Value(stop.stop_type());
-        builder.Key("road_distances"s).StartDict();
-        size_t road_dist_count = stop.road_distances_stop_name_size();
-        for (size_t index = 0; index < road_dist_count; ++index) {
-            builder.Key(stop.road_distances_stop_name(index));
-            builder.Value(static_cast<int>(stop.distances_between_stops(index)));
-        }
-        builder.EndDict(); // road_dist
-
-        builder.EndDict(); // stop
+        const ::transport_catalogue_proto::Stop& stop = proto.stops_in_tc(i);
+        catalogue.AddStop(stop.stop_name(), {stop.stop_coordinates().latitude(), stop.stop_coordinates().longitude()});
     }
+    // добавляем маршруты
+    size_t routes_count = proto.routes_in_tc_size();
+    for (size_t i = 0; i < routes_count; ++i) {
+        const ::transport_catalogue_proto::Route& route = proto.routes_in_tc(i);
+        std::vector<std::string> stops;
+        size_t stops_count = route.stops_in_route_size();
+        for (size_t index = 0; index < stops_count; ++index) {
+            stops.push_back(route.stops_in_route(index));
+        }
+        bool is_roundtrip = route.is_round_trip();
 
-    builder.EndArray(); // base_request
+        catalogue.AddRoute(route.route_name(), stops, is_roundtrip);
+    }
+    // добавляем RoutingSettings
+    const ::transport_catalogue_proto::RoutingSettings& router_setting = proto.router_setting();
+    catalogue.SetRoutingSettings(static_cast<int>(router_setting.bus_wait_time())
+                                ,static_cast<int>(router_setting.bus_velocity())
+                                ,static_cast<int>(router_setting.bus_speed_in_m_min()));
+
+    return catalogue;
 }
 
-void UnPackRenderSettings(json::Builder& builder, const transport_catalogue::TransportCatalogueProto& proto) {
-    const ::transport_catalogue::RenderSettings& render_setting = proto.render_settings();
+map_renderer::MapRenderer UnPackMR(const transport_catalogue_proto::TransportCatalogueProto& proto) {
+    map_renderer::MapRenderer map_renderer;
 
-    builder.Key("render_settings"s);
-    builder.StartDict();
-    builder.Key("width"s).Value(render_setting.width());
-    builder.Key("height"s).Value(render_setting.height());
-    builder.Key("padding"s).Value(render_setting.padding());
-    builder.Key("stop_radius"s).Value(render_setting.stop_radius());
-    builder.Key("line_width"s).Value(render_setting.line_width());
-    builder.Key("bus_label_font_size"s).Value(static_cast<int>(render_setting.bus_label_font_size()));
-    builder.Key("bus_label_offset"s).StartArray();
-    builder.Value(render_setting.bus_label_offset_dx());
-    builder.Value(render_setting.bus_label_offset_dy());
-    builder.EndArray();
-    builder.Key("stop_label_font_size"s).Value(static_cast<int>(render_setting.stop_label_font_size()));
-    builder.Key("stop_label_offset"s).StartArray();
-    builder.Value(render_setting.stop_label_offset_dx());
-    builder.Value(render_setting.stop_label_offset_dy());
-    builder.EndArray();
+    const ::transport_catalogue_proto::RenderSettings& render_setting = proto.render_settings();
+    auto& map_settings = map_renderer.GetMapSettings();
 
-    const ::transport_catalogue::Color& color = render_setting.underlayer_color();
+    map_settings.width = render_setting.width();
+    map_settings.height = render_setting.height();
 
+    map_settings.padding = render_setting.padding();
+
+    map_settings.line_width = render_setting.line_width();
+    map_settings.stop_radius = render_setting.stop_radius();
+
+    map_settings.bus_label_font_size = static_cast<int>(render_setting.bus_label_font_size());
+    map_settings.bus_label_offset.x = render_setting.bus_label_offset_dx();
+    map_settings.bus_label_offset.y = render_setting.bus_label_offset_dy();
+
+    map_settings.stop_label_font_size = static_cast<int>(render_setting.stop_label_font_size());
+    map_settings.stop_label_offset.x = render_setting.stop_label_offset_dx();
+    map_settings.stop_label_offset.y = render_setting.stop_label_offset_dy();
+
+    const ::transport_catalogue_proto::Color& color = render_setting.underlayer_color();
     if (color.color_string() != ""s) {
-        builder.Key("underlayer_color"s).Value(color.color_string());
+        map_settings.underlayer_color = color.color_string();
     } else if (color.color_a() != 0.0) {
-        builder.Key("underlayer_color"s).StartArray();
-        builder.Value(static_cast<int>(color.color_r()));
-        builder.Value(static_cast<int>(color.color_g()));
-        builder.Value(static_cast<int>(color.color_b()));
-        builder.Value(color.color_a());
-        builder.EndArray();
+        map_settings.underlayer_color = svg::Rgba{static_cast<uint8_t>(color.color_r())
+                                                ,static_cast<uint8_t>(color.color_g())
+                                                ,static_cast<uint8_t>(color.color_b())
+                                                ,color.color_a()};
     } else {
-        builder.Key("underlayer_color"s).StartArray();
-        builder.Value(static_cast<int>(color.color_r()));
-        builder.Value(static_cast<int>(color.color_g()));
-        builder.Value(static_cast<int>(color.color_b()));
-        builder.EndArray();
+        map_settings.underlayer_color = svg::Rgb{static_cast<uint8_t>(color.color_r())
+                                                ,static_cast<uint8_t>(color.color_g())
+                                                ,static_cast<uint8_t>(color.color_b())};
     }
 
-    builder.Key("underlayer_width"s).Value(render_setting.underlayer_width());
+    map_settings.underlayer_width = render_setting.underlayer_width();
 
-    builder.Key("color_palette"s).StartArray();
     size_t color_palette_size = render_setting.color_palette_size();
     for (size_t i = 0; i < color_palette_size; ++i) {
-        const ::transport_catalogue::Color& color = render_setting.color_palette(i);
-        if (color.color_string() != ""s) {
-            builder.Value(color.color_string());
-        } else if (color.color_a() != 0.0) {
-            builder.StartArray();
-            builder.Value(static_cast<int>(color.color_r()));
-            builder.Value(static_cast<int>(color.color_g()));
-            builder.Value(static_cast<int>(color.color_b()));
-            builder.Value(color.color_a());
-            builder.EndArray();
+        const ::transport_catalogue_proto::Color& color_in_palette = render_setting.color_palette(i);
+        if (color_in_palette.color_string() != ""s) {
+            map_settings.underlayer_color = color_in_palette.color_string();
+        } else if (color_in_palette.color_a() != 0.0) {
+            map_settings.underlayer_color = svg::Rgba{static_cast<uint8_t>(color_in_palette.color_r())
+                                                    ,static_cast<uint8_t>(color_in_palette.color_g())
+                                                    ,static_cast<uint8_t>(color_in_palette.color_b())
+                                                    ,color_in_palette.color_a()};
         } else {
-            builder.StartArray();
-            builder.Value(static_cast<int>(color.color_r()));
-            builder.Value(static_cast<int>(color.color_g()));
-            builder.Value(static_cast<int>(color.color_b()));
-            builder.EndArray();
+            map_settings.underlayer_color = svg::Rgb{static_cast<uint8_t>(color_in_palette.color_r())
+                                                ,static_cast<uint8_t>(color_in_palette.color_g())
+                                                ,static_cast<uint8_t>(color_in_palette.color_b())};
         }
     }
-    builder.EndArray(); // color_palette
 
-    builder.EndDict(); // render_settings
+    return map_renderer;
 }
 
-void UnPackRoutingSettings(json::Builder& builder, const transport_catalogue::TransportCatalogueProto& proto) {
-    builder.Key("routing_settings"s);
-    const ::transport_catalogue::RoutingSettings& router_setting = proto.router_setting();
-    builder.StartDict();
-    builder.Key("bus_wait_time"s).Value(static_cast<int>(router_setting.bus_wait_time()));
-    builder.Key("bus_velocity"s).Value(static_cast<int>(router_setting.bus_velocity()));
-    builder.EndDict(); // routing_settings
-}
+std::tuple<transport_catalogue::TransportCatalogue, map_renderer::MapRenderer> ProcessRequests::UnPack() const {
+    transport_catalogue::TransportCatalogue catalogue = UnPackTC(proto_);
+    map_renderer::MapRenderer map_renderer = UnPackMR(proto_);
 
-json::Document DeSerializator::UnPack() const {
-    using std::literals::string_literals::operator""s;
-
-    transport_catalogue::TransportCatalogueProto proto;
-
-    const std::filesystem::path path = process_requests_.GetRoot().AsMap().at("serialization_settings").AsMap().at("file").AsString();
-    std::ifstream in_file(path, std::ios::binary);
-    if (!proto.ParseFromIstream(&in_file)) {
-        std::cerr << "Can't open file" << std::endl;
-        abort();
-    }
-
-    json::Builder builder;
-    builder.StartDict();
-
-    UnPackBaseRequests(builder, proto);
-    UnPackRenderSettings(builder, proto);
-    UnPackRoutingSettings(builder, proto);
-    
-    builder.EndDict(); 
-
-    json::Document result(builder.Build());
-    return result;
-}
-
-const json::Document& DeSerializator::GetProcessRequests() const {
-    return process_requests_;
+    return std::make_tuple(catalogue, map_renderer);
 }

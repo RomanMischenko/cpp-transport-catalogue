@@ -277,6 +277,10 @@ map_renderer::MapSettings& map_renderer::MapRenderer::GetMapSettings() {
     return map_settings_;
 }
 
+const map_renderer::MapSettings& map_renderer::MapRenderer::GetMapSettings() const {
+    return map_settings_;
+}
+
 std::unordered_map<std::string, geo::Coordinates>& map_renderer::MapRenderer::GetStops() {
     return stops_;
 }
