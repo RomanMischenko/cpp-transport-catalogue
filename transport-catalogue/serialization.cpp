@@ -2,17 +2,18 @@
 
 using std::literals::string_literals::operator""s;
 
-MakeBase::MakeBase(const transport_catalogue::TransportCatalogue& catalogue
+using namespace serialization;
+
+Serialization::Serialization(const transport_catalogue::TransportCatalogue& catalogue
                 , const map_renderer::MapRenderer& map_renderer) 
 : catalogue_(catalogue)
 , map_renderer_(map_renderer)
 {}
 
-void PackStops(const transport_catalogue::TransportCatalogue& catalogue,
-                transport_catalogue_proto::TransportCatalogueProto& proto) {
+void Serialization::PackStops() {
     // добавляем остановки
-    for (const auto& stop_in_tc : catalogue.GetAllStops()) {
-        ::transport_catalogue_proto::Stop* new_stop_in_proto = proto.add_stops_in_tc();
+    for (const auto& stop_in_tc : catalogue_.GetAllStops()) {
+        ::transport_catalogue_proto::Stop* new_stop_in_proto = proto_.add_stops_in_tc();
         ::transport_catalogue_proto::Coordinates* coord = new_stop_in_proto->mutable_stop_coordinates();
         
         const std::string_view stop_name = stop_in_tc.first;
@@ -24,23 +25,22 @@ void PackStops(const transport_catalogue::TransportCatalogue& catalogue,
         coord->set_longitude(lng);   
     }
     // добавляем дистацию между ними
-    for (const auto& dist : catalogue.GetRoadDistance()) {
+    for (const auto& dist : catalogue_.GetRoadDistance()) {
         const std::string_view stop_from = dist.first.first->stop_name;
         const std::string_view stop_to = dist.first.second->stop_name;
         const double dist_bw_stops = dist.second;
-        proto.add_road_distances_stop_name_from(std::string(stop_from));
-        proto.add_road_distances_stop_name_to(std::string(stop_to));
-        proto.add_distances_between_stops(dist_bw_stops);
+        proto_.add_road_distances_stop_name_from(std::string(stop_from));
+        proto_.add_road_distances_stop_name_to(std::string(stop_to));
+        proto_.add_distances_between_stops(dist_bw_stops);
     }
 }
 
-void PackRoutes(const transport_catalogue::TransportCatalogue& catalogue,
-                transport_catalogue_proto::TransportCatalogueProto& proto) {
-    for (const auto& route_in_tc : catalogue.GetAllRoutes()) {
-        ::transport_catalogue_proto::Route* new_route_in_proto = proto.add_routes_in_tc();
+void Serialization::PackRoutes() {
+    for (const auto& route_in_tc : catalogue_.GetAllRoutes()) {
+        ::transport_catalogue_proto::Route* new_route_in_proto = proto_.add_routes_in_tc();
 
         const std::string_view route_name = route_in_tc.first;
-        const bool is_round_trip = catalogue.GetIsRoundTrip(route_name);
+        const bool is_round_trip = catalogue_.GetIsRoundTrip(route_name);
         
         new_route_in_proto->set_route_name(std::string(route_name));
         new_route_in_proto->set_is_round_trip(is_round_trip);
@@ -67,10 +67,9 @@ void InsertColor(::transport_catalogue_proto::Color* color_proto, const svg::Col
     }
 }
 
-void PackRenderSettings(const map_renderer::MapRenderer& map_renderer,
-                transport_catalogue_proto::TransportCatalogueProto& proto) {
-    ::transport_catalogue_proto::RenderSettings* render_settings_in_proto = proto.mutable_render_settings();
-    const map_renderer::MapSettings& render_settings_in_mr = map_renderer.GetMapSettings();
+void Serialization::PackRenderSettings() {
+    ::transport_catalogue_proto::RenderSettings* render_settings_in_proto = proto_.mutable_render_settings();
+    const map_renderer::MapSettings& render_settings_in_mr = map_renderer_.GetMapSettings();
 
     render_settings_in_proto->set_width(render_settings_in_mr.width);
     render_settings_in_proto->set_height(render_settings_in_mr.height);
@@ -99,24 +98,23 @@ void PackRenderSettings(const map_renderer::MapRenderer& map_renderer,
     }
 }
 
-void PackRoutingSettings(const transport_catalogue::TransportCatalogue& catalogue,
-                transport_catalogue_proto::TransportCatalogueProto& proto) {
-    ::transport_catalogue_proto::RoutingSettings* routint_setting_proto = proto.mutable_router_setting();
-    transport_catalogue::TransportCatalogue::RoutingSettings routint_setting_tc = catalogue.GetRoutingSettings();
+void Serialization::PackRoutingSettings() {
+    ::transport_catalogue_proto::RoutingSettings* routint_setting_proto = proto_.mutable_router_setting();
+    transport_catalogue::TransportCatalogue::RoutingSettings routint_setting_tc = catalogue_.GetRoutingSettings();
     routint_setting_proto->set_bus_wait_time(routint_setting_tc.bus_wait_time);
     routint_setting_proto->set_bus_velocity(routint_setting_tc.bus_velocity);
     routint_setting_proto->set_bus_speed_in_m_min(routint_setting_tc.bus_speed_in_m_min);
 }
 
-transport_catalogue_proto::TransportCatalogueProto MakeBase::Pack() {
-    PackStops(catalogue_, proto_);
-    PackRoutes(catalogue_, proto_);
-    PackRenderSettings(map_renderer_, proto_);
-    PackRoutingSettings(catalogue_, proto_);
+transport_catalogue_proto::TransportCatalogueProto Serialization::Pack() {
+    PackStops();
+    PackRoutes();
+    PackRenderSettings();
+    PackRoutingSettings();
     return proto_;
 }
 
-ProcessRequests::ProcessRequests(const transport_catalogue_proto::TransportCatalogueProto& proto
+DeSerialization::DeSerialization(const transport_catalogue_proto::TransportCatalogueProto& proto
                                 ,transport_catalogue::TransportCatalogue& catalogue
                                 ,map_renderer::MapRenderer& map_render) 
 : proto_(proto)
@@ -124,17 +122,17 @@ ProcessRequests::ProcessRequests(const transport_catalogue_proto::TransportCatal
 , map_renderer_(map_render)
 {}
 
-void UnPackTC(const transport_catalogue_proto::TransportCatalogueProto& proto, transport_catalogue::TransportCatalogue& catalogue) {
+void DeSerialization::UnPackTransportCatalogue() {
     // сначала добавляем остановки
-    size_t stops_count = proto.stops_in_tc_size();
+    size_t stops_count = proto_.stops_in_tc_size();
     for (size_t i = 0; i < stops_count; ++i) {
-        const ::transport_catalogue_proto::Stop& stop = proto.stops_in_tc(i);
-        catalogue.AddStop(stop.stop_name(), {stop.stop_coordinates().latitude(), stop.stop_coordinates().longitude()});
+        const ::transport_catalogue_proto::Stop& stop = proto_.stops_in_tc(i);
+        catalogue_.AddStop(stop.stop_name(), {stop.stop_coordinates().latitude(), stop.stop_coordinates().longitude()});
     }
     // добавляем маршруты
-    size_t routes_count = proto.routes_in_tc_size();
+    size_t routes_count = proto_.routes_in_tc_size();
     for (size_t i = 0; i < routes_count; ++i) {
-        const ::transport_catalogue_proto::Route& route = proto.routes_in_tc(i);
+        const ::transport_catalogue_proto::Route& route = proto_.routes_in_tc(i);
         std::vector<std::string> stops;
         size_t stops_count = route.stops_in_route_size();
         for (size_t index = 0; index < stops_count; ++index) {
@@ -142,29 +140,29 @@ void UnPackTC(const transport_catalogue_proto::TransportCatalogueProto& proto, t
         }
         bool is_roundtrip = route.is_round_trip();
 
-        catalogue.AddRoute(route.route_name(), stops, is_roundtrip);
+        catalogue_.AddRoute(route.route_name(), stops, is_roundtrip);
     }
     // добавляем road_distance
-    size_t road_distance_size = proto.distances_between_stops_size();
+    size_t road_distance_size = proto_.distances_between_stops_size();
     for (int i = 0; i < road_distance_size; ++i) {
-        const std::string& stop_name_from = proto.road_distances_stop_name_from(i);
-        const std::string& stop_name_to = proto.road_distances_stop_name_to(i);
-        uint64_t dist_bw_stops = proto.distances_between_stops(i);
-        catalogue.SetRoadDistanceBetweenStops(*catalogue.FindStop(stop_name_from)
-                                            , *catalogue.FindStop(stop_name_to)
+        const std::string& stop_name_from = proto_.road_distances_stop_name_from(i);
+        const std::string& stop_name_to = proto_.road_distances_stop_name_to(i);
+        uint64_t dist_bw_stops = proto_.distances_between_stops(i);
+        catalogue_.SetRoadDistanceBetweenStops(*catalogue_.FindStop(stop_name_from)
+                                            , *catalogue_.FindStop(stop_name_to)
                                             , dist_bw_stops);
     }
     // добавляем RoutingSettings
-    const ::transport_catalogue_proto::RoutingSettings& router_setting = proto.router_setting();
-    catalogue.SetRoutingSettings(static_cast<int>(router_setting.bus_wait_time())
+    const ::transport_catalogue_proto::RoutingSettings& router_setting = proto_.router_setting();
+    catalogue_.SetRoutingSettings(static_cast<int>(router_setting.bus_wait_time())
                                 ,static_cast<int>(router_setting.bus_velocity())
                                 ,static_cast<int>(router_setting.bus_speed_in_m_min()));
 
 }
 
-void UnPackMR(const transport_catalogue_proto::TransportCatalogueProto& proto, map_renderer::MapRenderer& map_renderer) {
-    const ::transport_catalogue_proto::RenderSettings& render_setting = proto.render_settings();
-    auto& map_settings = map_renderer.GetMapSettings();
+void DeSerialization::UnPackMapRenderer() {
+    const ::transport_catalogue_proto::RenderSettings& render_setting = proto_.render_settings();
+    auto& map_settings = map_renderer_.GetMapSettings();
 
     map_settings.width = render_setting.width();
     map_settings.height = render_setting.height();
@@ -217,7 +215,7 @@ void UnPackMR(const transport_catalogue_proto::TransportCatalogueProto& proto, m
 
 }
 
-void ProcessRequests::UnPack() {
-    UnPackTC(proto_, catalogue_);
-    UnPackMR(proto_, map_renderer_);
+void DeSerialization::UnPack() {
+    UnPackTransportCatalogue();
+    UnPackMapRenderer();
 }

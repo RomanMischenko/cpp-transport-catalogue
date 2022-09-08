@@ -41,7 +41,7 @@ int main(int argc, char* argv[]) {
         // сохраняем в файл
         const std::filesystem::path path = doc.GetRoot().AsMap().at("serialization_settings").AsMap().at("file").AsString();
         std::ofstream out_file(path, std::ios::binary);
-        MakeBase make_base(data, mr);
+        serialization::Serialization make_base(data, mr);
         transport_catalogue_proto::TransportCatalogueProto proto = make_base.Pack();
         proto.SerializeToOstream(&out_file);
 
@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
 
         transport_catalogue::TransportCatalogue data;
         map_renderer::MapRenderer mr;
-        ProcessRequests process_requests(proto.value(), data, mr);
+        serialization::DeSerialization process_requests(proto.value(), data, mr);
         process_requests.UnPack();
         
         // создаем каталог маршрутов

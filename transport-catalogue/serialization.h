@@ -11,29 +11,41 @@
 #include <iostream>
 #include <tuple>
 
-using TC = transport_catalogue::TransportCatalogue;
-using MR = map_renderer::MapRenderer;
+namespace serialization {
 
-class MakeBase {
+class Serialization {
 public:
-    MakeBase() = delete;
-    MakeBase(const TC& tc, const MR& mr);
+    Serialization(const transport_catalogue::TransportCatalogue& tc
+            , const map_renderer::MapRenderer& mr);
+
     transport_catalogue_proto::TransportCatalogueProto Pack();
-    void PackInFile(const std::filesystem::path&) const;
+    // void PackInFile(const std::filesystem::path&) const;
 
 private:
-    TC catalogue_;
-    MR map_renderer_;
+    transport_catalogue::TransportCatalogue catalogue_;
+    map_renderer::MapRenderer map_renderer_;
     transport_catalogue_proto::TransportCatalogueProto proto_;
+
+    void PackStops();
+    void PackRoutes();
+    void PackRenderSettings();
+    void PackRoutingSettings();
 };
 
-class ProcessRequests {
+class DeSerialization {
 public:
-    ProcessRequests() = delete;
-    ProcessRequests(const transport_catalogue_proto::TransportCatalogueProto&, TC&, MR&);
+    DeSerialization(const transport_catalogue_proto::TransportCatalogueProto&
+                    , transport_catalogue::TransportCatalogue&
+                    , map_renderer::MapRenderer&);
+    
     void UnPack();
 private:
     const transport_catalogue_proto::TransportCatalogueProto& proto_;
-    TC& catalogue_;
-    MR& map_renderer_;
+    transport_catalogue::TransportCatalogue& catalogue_;
+    map_renderer::MapRenderer& map_renderer_;
+
+    void UnPackTransportCatalogue();
+    void UnPackMapRenderer();
 };
+
+} // namespace serialization
